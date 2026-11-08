@@ -5,18 +5,27 @@
 ;   (Se puede usar la subrutina MAIN_MENU desde otro programa que no sea este si es necesario).
 ;
 
+.ORIG x3000
+BR main
 
+
+;   **Solo para los ADMINISTRADOR**
+;   Cambiar la subrutina de MAIN_MENU, por la de MAIN_MENU_PROGRESO:
+;   -   Comentar las dos lineas de abajo.
+;   -   Descomentar las dos siguientes.
+;   -   Compilar.
 
 .EXTERNAL MAIN_MENU-MAIN_MENU
-; Por que es el programa main, las direcciones de simbolos externos los pongo despues del programa...
+sub_main_menu       .FILL MAIN_MENU-MAIN_MENU
 
-.ORIG x3000
+;.EXTERNAL MAIN_MENU_PROGRESO-MAIN_MENU
+;sub_main_menu       .FILL MAIN_MENU_PROGRESO-MAIN_MENU
 
+main
     LD R0 sub_main_menu
     JSRR R0
     HALT
 
-sub_main_menu       .FILL MAIN_MENU-MAIN_MENU
 
 
 .END

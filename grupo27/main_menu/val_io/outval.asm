@@ -16,6 +16,7 @@ OUTVAL
     ; [R0] entero
     ; [R1] fraccionario
 
+    ST R2 outval_r2                     ;
     ST R3 outval_r3                     ;
     ST R4 outval_r4                     ;
     ST R7 outval_r7                     ;
@@ -30,11 +31,13 @@ OUTVAL
     ADD R0 R0 #10                       ;
     OUT                                 ;   print('\n')
 
+    LD R2 outval_r2                     ;
     LD R3 outval_r3                     ;
     LD R4 outval_r4                     ;
     LD R7 outval_r7                     ;
     RET                                 ;
 
+outval_r2       .FILL #0
 outval_r3       .FILL #0 
 outval_r4       .FILL #0 
 outval_r7       .FILL #0 

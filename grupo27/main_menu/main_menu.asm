@@ -488,6 +488,87 @@ main_menu_two_q15
     JMP R1                              ;   # Cambio de nodo (offset = 0)
 
 
+;   ==- Controlador subrutinas de un DQ15.16 -==================================
+main_menu_one_dq16
+    LD R5 main_menu_state               ;   [R5] nodo = [estado]
+
+    LDR R0 R5 #1                        ;
+    PUTS                                ;   print(nodo.texto)
+
+    LD R0 main_menu_prompt_dq16a        ;
+    PUTS                                ;   print("a (Q15.16) > ")
+    LD R2 sub_getval                    ;
+    JSRR R2                             ;   [R0] = getval()
+
+    LDR R2 R5 #4                        ;
+    LDR R2 R2 #0                        ;
+    JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
+
+    ST R0 main_menu_aux_0               ;
+    ST R1 main_menu_aux_1               ;
+
+    LD R0 main_menu_prompt_dq16         ;
+    PUTS                                ;   print("(Q15.16) ")
+
+    LD R0 main_menu_aux_0               ;
+    LD R1 main_menu_aux_1               ;
+    LD R2 sub_outval                    ;
+    JSRR R2                             ;   outval(result)
+
+    LD R0 sub_pause                     ;
+    JSRR R0                             ;   pause()
+
+    AND R0 R0 #0                        ;
+    LD R1 main_menu_swap_node_ads       ;
+    JMP R1                              ;   # Cambio de nodo (offset = 0)
+
+
+    ;   ==- Controlador subrutinas de dor Q7.8 con resultado DQ15.16 -==============
+main_menu_two_q8_result_dq16
+    LD R5 main_menu_state               ;   [R5] nodo = [estado]
+
+    LDR R0 R5 #1                        ;
+    PUTS                                ;   print(nodo.texto)
+
+    LD R0 main_menu_prompt_q8a          ;
+    PUTS                                ;   print("a (Q7.8) > ")
+    LD R0 main_menu_8                   ;
+    LD R2 sub_getval_qm_n               ;
+    JSRR R2                             ;   [R0] = getval_Qm_n(8)
+
+    LD R0 main_menu_aux_0               ;
+
+    LD R0 main_menu_prompt_q8b          ;
+    PUTS                                ;   print("b (Q7.8) > ")
+    LD R0 main_menu_8                   ;
+    LD R2 sub_getval_qm_n               ;
+    JSRR R2                             ;   [R0] = getval_Qm_n(8)
+
+    ADD R1 R0 #0                        ;
+    LD R0 main_menu_aux_0               ;
+
+    LDR R2 R5 #4                        ;
+    LDR R2 R2 #0                        ;
+    JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
+
+    ST R0 main_menu_aux_0               ;
+    ST R1 main_menu_aux_1               ;
+
+    LD R0 main_menu_prompt_dq16         ;
+    PUTS                                ;   print("(Q15.16) ")
+
+    LD R0 main_menu_aux_0               ;
+    LD R1 main_menu_aux_1               ;
+    LD R2 sub_outval                    ;
+    JSRR R2                             ;   outval(result)
+
+    LD R0 sub_pause                     ;
+    JSRR R0                             ;   pause()
+
+    AND R0 R0 #0                        ;
+    LD R1 main_menu_swap_node_ads       ;
+    JMP R1                              ;   # Cambio de nodo (offset = 0)
+
 
 ;   ============================================================================
 ;   ==- Prompt texts -==========================================================
@@ -560,7 +641,7 @@ main_menu_sin_text          .STRINGZ "\n\n==SENO TRIGONOMETRICO==\n[0] TAYLOR\n[
 main_menu_sin_filter        .STRINGZ "02"
 main_menu_sin_next          .FILL main_menu_sin_taylor
                             .FILL main_menu_sin_table
-                            .FILL main_menu_sin_chev
+                            .FILL main_menu_sin_cheb
 ;   ----------------------------------------------------------------------------
 main_menu_sin_taylor        .FILL main_menu_one_q12
                             .FILL main_menu_sin_taylor_text
@@ -578,13 +659,13 @@ main_menu_sin_table         .FILL main_menu_one_q12_result_q14
 main_menu_sin_table_text    .STRINGZ "\n\n==SENO TRIGONOMETRICO (TABLE)==\n"
 main_menu_sin_table_next    .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_sin_chev          .FILL main_menu_one_q12_result_q14
-                            .FILL main_menu_sin_chev_text
+main_menu_sin_cheb          .FILL main_menu_one_q12_result_q14
+                            .FILL main_menu_sin_cheb_text
                             .FILL #0
-                            .FILL main_menu_sin_chev_next
-                            .FILL main_menu_sub_sin_chev
-main_menu_sin_chev_text     .STRINGZ "\n\n==SENO TRIGONOMETRICO (CHEBYSHEV-PADE)==\n"
-main_menu_sin_chev_next     .FILL main_menu_init
+                            .FILL main_menu_sin_cheb_next
+                            .FILL main_menu_sub_sin_cheb
+main_menu_sin_cheb_text     .STRINGZ "\n\n==SENO TRIGONOMETRICO (CHEVYSHEV-PADE)==\n"
+main_menu_sin_cheb_next     .FILL main_menu_init
 
 ;   ============================================================================
 main_menu_cos               .FILL main_menu_one_q12_result_q14
@@ -592,7 +673,7 @@ main_menu_cos               .FILL main_menu_one_q12_result_q14
                             .FILL #0
                             .FILL main_menu_cos_next
                             .FILL main_menu_sub_cos
-main_menu_cos_text          .STRINGZ "\n\n==COSENO TRIGONOMETRICO==\n"
+main_menu_cos_text          .STRINGZ "\n\n==COSENO TRIGONOMETRICO (TABLE)==\n"
 main_menu_cos_next          .FILL main_menu_init
 
 ;   ============================================================================
@@ -641,7 +722,7 @@ main_menu_sqrt_nonres       .FILL main_menu_one_q8
 main_menu_sqrt_nonres_text  .STRINGZ "\n\n==RAIZ CUADRADA (NON RESTORING)==\n"
 main_menu_sqrt_nonres_next  .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_sqrt_nr           .FILL main_menu_one_q8
+main_menu_sqrt_nr           .FILL main_menu_one_dq16
                             .FILL main_menu_sqrt_nr_text
                             .FILL #0
                             .FILL main_menu_sqrt_nr_next
@@ -650,7 +731,7 @@ main_menu_sqrt_nr_text      .STRINGZ "\n\n==RAIZ CUADRADA (NEWTON-RAPHSON)==\n"
 main_menu_sqrt_nr_next      .FILL main_menu_init
 
 ;   ============================================================================
-main_menu_exp               .FILL main_menu_one_int
+main_menu_exp               .FILL main_menu_one_q12_result_q8
                             .FILL main_menu_exp_text
                             .FILL #0
                             .FILL main_menu_exp_next
@@ -697,7 +778,7 @@ main_menu_mult_next         .FILL main_menu_mult_cordic
                             .FILL main_menu_mult_basic
                             .FILL main_menu_mult_booth
 ;   ----------------------------------------------------------------------------
-main_menu_mult_cordic       .FILL main_menu_two_int
+main_menu_mult_cordic       .FILL main_menu_two_q8
                             .FILL main_menu_mult_cordic_text
                             .FILL #0
                             .FILL main_menu_mult_cordic_next
@@ -705,7 +786,7 @@ main_menu_mult_cordic       .FILL main_menu_two_int
 main_menu_mult_cordic_text  .STRINGZ "\n\n==MULTIPLICACION (CORDIC)==\n"
 main_menu_mult_cordic_next  .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_mult_basic        .FILL main_menu_two_int
+main_menu_mult_basic        .FILL main_menu_two_q8_result_dq16
                             .FILL main_menu_mult_basic_text
                             .FILL #0
                             .FILL main_menu_mult_basic_next
@@ -713,7 +794,7 @@ main_menu_mult_basic        .FILL main_menu_two_int
 main_menu_mult_basic_text   .STRINGZ "\n\n==MULTIPLICACION (BASIC)==\n"
 main_menu_mult_basic_next   .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_mult_booth        .FILL main_menu_two_int
+main_menu_mult_booth        .FILL main_menu_two_q8
                             .FILL main_menu_mult_booth_text
                             .FILL #0
                             .FILL main_menu_mult_booth_next
@@ -732,7 +813,7 @@ main_menu_div_filter        .STRINGZ "01"
 main_menu_div_next          .FILL main_menu_div_long
                             .FILL main_menu_div_nr
 ;   ----------------------------------------------------------------------------
-main_menu_div_long          .FILL main_menu_two_int
+main_menu_div_long          .FILL main_menu_two_q8
                             .FILL main_menu_div_long_text
                             .FILL #0
                             .FILL main_menu_div_long_next
@@ -740,7 +821,7 @@ main_menu_div_long          .FILL main_menu_two_int
 main_menu_div_long_text     .STRINGZ "\n\n==DIVISION (LONG DIVISION)==\n"
 main_menu_div_long_next     .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_div_nr            .FILL main_menu_two_int
+main_menu_div_nr            .FILL main_menu_two_q8
                             .FILL main_menu_div_nr_text
                             .FILL #0
                             .FILL main_menu_div_nr_next
@@ -767,12 +848,12 @@ main_menu_mcm_text          .STRINGZ "\n\n==MINIMO COMUN MULTIPLO==\n"
 main_menu_mcm_next          .FILL main_menu_init
 
 ;   ============================================================================
-main_menu_trbilin           .FILL main_menu_one_q12
+main_menu_trbilin           .FILL main_menu_two_q15
                             .FILL main_menu_trbilin_text
                             .FILL #0
                             .FILL main_menu_trbilin_next
                             .FILL main_menu_sub_trbilin
-main_menu_trbilin_text      .STRINGZ "\n\n==TRANSFORMACION BILINEAL==\n"
+main_menu_trbilin_text      .STRINGZ "\n\n==TRANSFORMACION BILINEAL (DIVISION CORDIC)==\n"
 main_menu_trbilin_next      .FILL main_menu_init
 
 ;   ============================================================================
@@ -829,7 +910,7 @@ main_menu_sub_pow_sumas     .FILL NULL_SUBRUTINE        ; <- POW_SUMAS
 main_menu_sub_pow_expbin    .FILL NULL_SUBRUTINE        ; <- POW_EXPBIN
 main_menu_sub_sin_taylor    .FILL NULL_SUBRUTINE        ; <- SIN_TAYLOR
 main_menu_sub_sin_table     .FILL NULL_SUBRUTINE        ; <- SIN_TABLE
-main_menu_sub_sin_chev      .FILL NULL_SUBRUTINE        ; <- SIN_CHEV
+main_menu_sub_sin_cheb      .FILL NULL_SUBRUTINE        ; <- SIN_CHEB
 main_menu_sub_cos           .FILL NULL_SUBRUTINE        ; <- COS
 main_menu_sub_base_dec      .FILL NULL_SUBRUTINE        ; <- BASE_DEC
 main_menu_sub_base_hex      .FILL NULL_SUBRUTINE        ; <- BASE_HEX
