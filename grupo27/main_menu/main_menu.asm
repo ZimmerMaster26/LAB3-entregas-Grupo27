@@ -3,27 +3,18 @@
 .EXTERNAL GETCFILTERED-GETCFILTERED
 .EXTERNAL FROMHEX-FROMHEX
 .EXTERNAL PAUSE-PAUSE
-sub_getcfiltered    .FILL GETCFILTERED-GETCFILTERED
-sub_fromhex         .FILL FROMHEX-FROMHEX
-sub_pause           .FILL PAUSE-PAUSE
 
-.EXTERNAL Q14_TO_DQ16-Q14_TO_DQ16
-.EXTERNAL Q12_TO_DQ16-Q12_TO_DQ16
-.EXTERNAL Q8_TO_DQ16-Q8_TO_DQ16
-sub_from_q14        .FILL Q14_TO_DQ16-Q14_TO_DQ16
-sub_from_q12        .FILL Q12_TO_DQ16-Q12_TO_DQ16
-sub_from_q8         .FILL Q8_TO_DQ16-Q8_TO_DQ16
+.EXTERNAL FROM_QM_N-FROM_QM_N
 
 .EXTERNAL GETVAL-GETVAL         
 .EXTERNAL GETVAL_INT-GETVAL_INT 
-.EXTERNAL GETVAL_Q8-GETVAL_Q8   
-.EXTERNAL GETVAL_Q12-GETVAL_Q12 
+.EXTERNAL GETVAL_QM_N-GETVAL_QM_N   
 .EXTERNAL OUTVAL-OUTVAL
-sub_getval          .FILL GETVAL-GETVAL
-sub_getval_int      .FILL GETVAL_INT-GETVAL_INT
-sub_getval_q8       .FILL GETVAL_Q8-GETVAL_Q8
-sub_getval_q12      .FILL GETVAL_Q12-GETVAL_Q12
-sub_outval          .FILL OUTVAL-OUTVAL
+
+
+;   Como es un programa muy extenso, las variables estan en un punto medio para aprovechar el PCoffset
+
+
 
 ;   ============================================================================
 ;   Subrutina: MAIN_MENU
@@ -73,6 +64,18 @@ main_menu_swap_node                     ;
     JMP R0                              ;   goto nodo.controlador
 
 
+;   ==- Return -================================================================
+main_menu_return                        ;
+    LD R0 main_menu_r0                  ;
+    LD R1 main_menu_r1                  ;
+    LD R2 main_menu_r2                  ;
+    LD R3 main_menu_r3                  ;
+    LD R4 main_menu_r4                  ;
+    LD R5 main_menu_r5                  ;
+    LD R7 main_menu_r7                  ;
+    RET                                 ;
+
+
 ;   ==- Controlador para mostrar menus -========================================
 main_menu_show_menu                     ;
     LD R5 main_menu_state               ;   [R5] nodo = [estado]
@@ -94,40 +97,18 @@ main_menu_show_menu                     ;
     BR main_menu_swap_node              ;   # Cambio de nodo (offset = valor)
 
 
-;   ==- Controlador subrutinas placeholder -====================================
-main_menu_placeholder
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LEA R0 main_menu_placeholder_text   ;
-    PUTS                                ;   print("placeholder text...")
-
-    LEA R0 main_menu_prompt_a           ;
-    LEA R1 main_menu_text_a             ;
-    LD R2 sub_getval                    ; 
-    JSRR R2                             ;   [R0, R1] = getval("a")
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    BR main_menu_swap_node              ;   # Cambio de nodo (offset = 0)
-main_menu_placeholder_text .STRINGZ "No implementado aun... pero probemos un Q15.16\n"
-
-
 ;   ==- Controlador subrutinas de un entero (no muestra resultado) -============
-main_menu_one_integer_noresult
+main_menu_one_int_noresult
     LD R5 main_menu_state               ;   [R5] nodo = [estado]
 
     LDR R0 R5 #1                        ;
     PUTS                                ;   print(nodo.texto)
 
-    LEA R0 main_menu_prompt_a           ;
-    LEA R1 main_menu_text_a             ;
+    LD R0 main_menu_prompt_inta         ;
+    PUTS                                ;   print(" a (int) > ")
+
     LD R2 sub_getval_int                ;
-    JSRR R2                             ;   [R0] = getval_int("a")
+    JSRR R2                             ;   [R0] = getval_int()
 
     LDR R2 R5 #4                        ;
     LDR R2 R2 #0                        ;
@@ -140,24 +121,57 @@ main_menu_one_integer_noresult
     BR main_menu_swap_node              ;   swap_node(offset = 0)
 
 
-;   ==- Controlador subrutinas de dos enteros  -================================
-main_menu_two_integer
+;   ==- Controlador subrutinas de un entero  -==================================
+main_menu_one_int
     LD R5 main_menu_state               ;   [R5] nodo = [estado]
 
     LDR R0 R5 #1                        ;
     PUTS                                ;   print(nodo.texto)
 
-    LEA R0 main_menu_prompt_a           ;
-    LEA R1 main_menu_text_a             ;
-    LD R2 sub_getval_int                ;
-    JSRR R2                             ;   [R0] = getval_int("a")
+    LD R0 main_menu_prompt_inta         ;
+    PUTS                                ;   print(" a (int) > ")
+    LD R0 sub_getval_int                ;
+    JSRR R0                             ;   [R0] = getval_int()
+
+    LDR R2 R5 #4                        ;
+    LDR R2 R2 #0                        ;
+    JSRR R2                             ;   [R0] result = node.subrutina(value_a)
 
     ST R0 main_menu_aux_0               ;
 
-    LEA R0 main_menu_prompt_b           ;
-    LEA R1 main_menu_text_b             ;
-    LD R2 sub_getval_int                ;
-    JSRR R2                             ;   [R0] = getval_int("b")
+    LD R0 main_menu_prompt_int          ;
+    PUTS                                ;   print("(int) ")
+
+    LD R0 main_menu_aux_0               ;
+    AND R1 R1 #0                        ;
+    LD R2 sub_outval                    ;
+    JSRR R2                             ;   outval(result)
+
+    LD R0 sub_pause                     ;
+    JSRR R0                             ;   pause()
+
+    AND R0 R0 #0                        ;
+    BR main_menu_swap_node              ;   swap_node(offset = 0)
+
+
+;   ==- Controlador subrutinas de dos enteros  -================================
+main_menu_two_int
+    LD R5 main_menu_state               ;   [R5] nodo = [estado]
+
+    LDR R0 R5 #1                        ;
+    PUTS                                ;   print(nodo.texto)
+
+    LD R0 main_menu_prompt_inta         ;
+    PUTS                                ;   print(" a (int) > ")
+    LD R0 sub_getval_int                ;
+    JSRR R0                             ;   [R0] = getval_int()
+
+    ST R0 main_menu_aux_0               ;
+
+    LD R0 main_menu_prompt_intb         ;
+    PUTS                                ;   print(" b (int) > ")
+    LD R0 sub_getval_int                ;
+    JSRR R0                             ;   [R0] = getval_int()
 
     ADD R1 R0 #0                        ;
     LD R0 main_menu_aux_0               ;
@@ -166,6 +180,12 @@ main_menu_two_integer
     LDR R2 R2 #0                        ;
     JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
 
+    ST R0 main_menu_aux_0               ;
+
+    LD R0 main_menu_prompt_int          ;
+    PUTS                                ;   print("(int) ")
+
+    LD R0 main_menu_aux_0               ;
     AND R1 R1 #0                        ;
     LD R2 sub_outval                    ;
     JSRR R2                             ;   outval(result)
@@ -178,25 +198,33 @@ main_menu_two_integer
 
 
 ;   ==- Controlador subrutinas de un Q3.12 -====================================
-main_menu_one_q3_12
+main_menu_one_q12
     LD R5 main_menu_state               ;   [R5] nodo = [estado]
 
     LDR R0 R5 #1                        ;
     PUTS                                ;   print(nodo.texto)
 
-    LEA R0 main_menu_prompt_a           ;
-    LEA R1 main_menu_text_a             ;
-    LD R2 sub_getval_q12                ;
-    JSRR R2                             ;   [R0] = getval_q12("a")
+    LD R0 main_menu_prompt_q12a         ;
+    PUTS                                ;   print("a (Q3.12) > ")
+    LD R0 main_menu_12                  ;
+    LD R2 sub_getval_qm_n               ;
+    JSRR R2                             ;   [R0] = getval_Qm_n(12)
 
     LDR R2 R5 #4                        ;
     LDR R2 R2 #0                        ;
     JSRR R2                             ;   [R0] result = node.subrutina(value_a)
 
-    LD R1 sub_from_q12                  ;
-    JSRR R1                             ;
+    ST R0 main_menu_aux_0               ;
+
+    LD R0 main_menu_prompt_q12          ;
+    PUTS                                ;   print("(Q3.12) ")
+
+    LD R0 main_menu_aux_0               ;
+    LD R1 main_menu_12                  ;
+    LD R2 sub_from_qm_n                 ;
+    JSRR R2                             ;
     LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(fromQ12(result))
+    JSRR R2                             ;   outval(fromQm_n(result, 12))
 
     LD R0 sub_pause                     ;
     JSRR R0                             ;   pause()
@@ -206,91 +234,33 @@ main_menu_one_q3_12
 
 
 ;   ==- Controlador subrutinas de un Q3.12 con resultado en Q1.14 -=============
-main_menu_one_q3_12_result_q1_14
+main_menu_one_q12_result_q8
     LD R5 main_menu_state               ;   [R5] nodo = [estado]
 
     LDR R0 R5 #1                        ;
     PUTS                                ;   print(nodo.texto)
 
-    LEA R0 main_menu_prompt_a           ;
-    LEA R1 main_menu_text_a             ;
-    LD R2 sub_getval_q12                ;
-    JSRR R2                             ;   [R0] = getval_q12("a")
+    LD R0 main_menu_prompt_q12a         ;
+    PUTS                                ;   print("a (Q3.12) > ")
+    LD R0 main_menu_12                  ;
+    LD R2 sub_getval_qm_n               ;
+    JSRR R2                             ;   [R0] = getval_Qm_n(12)
 
     LDR R2 R5 #4                        ;
     LDR R2 R2 #0                        ;
     JSRR R2                             ;   [R0] result = node.subrutina(value_a)
-
-    LD R1 sub_from_q14                  ;
-    JSRR R1                             ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(fromQ14(result))
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    BR main_menu_swap_node              ;   # Cambio de nodo (offset = 0)
-
-
-;   ==- Controlador subrutinas de un Q7.8 -=====================================
-main_menu_one_q7_8
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LEA R0 main_menu_prompt_a           ;
-    LEA R1 main_menu_text_a             ;
-    LD R2 sub_getval_q8                 ;
-    JSRR R2                             ;   [R0] = getval_q8("a")
-
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a)
-
-    LD R1 sub_from_q8                   ;
-    JSRR R1                             ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(fromQ8(result))
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    BR main_menu_swap_node              ;   # Cambio de nodo (offset = 0)
-
-
-;   ==- Controlador subrutinas de dos Q7.8 -====================================
-main_menu_two_q7_8
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LEA R0 main_menu_prompt_a           ;
-    LEA R1 main_menu_text_a             ;
-    LD R2 sub_getval_q8                 ;
-    JSRR R2                             ;   [R0] = getval_q8("a")
 
     ST R0 main_menu_aux_0               ;
 
-    LEA R0 main_menu_prompt_b           ;
-    LEA R1 main_menu_text_b             ;
-    LD R2 sub_getval_q8                 ;
-    JSRR R2                             ;   [R0] = getval_q8("b")
-
-    ADD R1 R0 #0                        ;
+    LD R0 main_menu_prompt_q8           ;
+    PUTS                                ;   print("(Q7.8) ")
+    
     LD R0 main_menu_aux_0               ;
-
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
-
-    LD R1 sub_from_q8                   ;
-    JSRR R1                             ;
+    LD R1 main_menu_8                   ;
+    LD R2 sub_from_qm_n                 ;
+    JSRR R2                             ;
     LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(fromQ8(result))
+    JSRR R2                             ;   outval(fromQm_n(result, 8))
 
     LD R0 sub_pause                     ;
     JSRR R0                             ;   pause()
@@ -299,16 +269,82 @@ main_menu_two_q7_8
     BR main_menu_swap_node              ;   # Cambio de nodo (offset = 0)
 
 
-;   ==- Return -================================================================
-main_menu_return                        ;
-    LD R0 main_menu_r0                  ;
-    LD R1 main_menu_r1                  ;
-    LD R2 main_menu_r2                  ;
-    LD R3 main_menu_r3                  ;
-    LD R4 main_menu_r4                  ;
-    LD R5 main_menu_r5                  ;
-    LD R7 main_menu_r7                  ;
-    RET                                 ;
+;   ==- Controlador subrutinas de un Q3.12 con resultado en Q1.14 -=============
+main_menu_one_q12_result_q14
+    LD R5 main_menu_state               ;   [R5] nodo = [estado]
+
+    LDR R0 R5 #1                        ;
+    PUTS                                ;   print(nodo.texto)
+
+    LD R0 main_menu_prompt_q12a         ;
+    PUTS                                ;   print("a (Q3.12) > ")
+    LD R0 main_menu_12                  ;
+    LD R2 sub_getval_qm_n               ;
+    JSRR R2                             ;   [R0] = getval_Qm_n(12)
+
+    LDR R2 R5 #4                        ;
+    LDR R2 R2 #0                        ;
+    JSRR R2                             ;   [R0] result = node.subrutina(value_a)
+
+    ST R0 main_menu_aux_0               ;
+
+    LD R0 main_menu_prompt_q14          ;
+    PUTS                                ;   print("(Q1.14) ")
+    
+    LD R0 main_menu_aux_0               ;
+    LD R1 main_menu_14                  ;
+    LD R2 sub_from_qm_n                 ;
+    JSRR R2                             ;
+    LD R2 sub_outval                    ;
+    JSRR R2                             ;   outval(fromQm_n(result, 14))
+
+    LD R0 sub_pause                     ;
+    JSRR R0                             ;   pause()
+
+    AND R0 R0 #0                        ;
+    BR main_menu_swap_node              ;   # Cambio de nodo (offset = 0)
+
+
+
+
+;   ==- Controlador subrutinas de un Q7.8 -=====================================
+main_menu_one_q8
+    LD R5 main_menu_state               ;   [R5] nodo = [estado]
+
+    LDR R0 R5 #1                        ;
+    PUTS                                ;   print(nodo.texto)
+
+    LD R0 main_menu_prompt_q8a          ;
+    PUTS                                ;   print("a (Q7.8) > ")
+    LD R0 main_menu_8                   ;
+    LD R2 sub_getval_qm_n               ;
+    JSRR R2                             ;   [R0] = getval_Qm_n(8)
+
+    LDR R2 R5 #4                        ;
+    LDR R2 R2 #0                        ;
+    JSRR R2                             ;   [R0] result = node.subrutina(value_a)
+
+    ST R0 main_menu_aux_0               ;
+
+    LD R0 main_menu_prompt_q8           ;
+    PUTS                                ;   print("(Q7.8) ")
+
+    LD R0 main_menu_aux_0               ;
+    LD R1 main_menu_8                   ;
+    LD R2 sub_from_qm_n                 ;
+    JSRR R2                             ;
+    LD R2 sub_outval                    ;
+    JSRR R2                             ;   outval(fromQm_n(result, 8))
+
+    LD R0 sub_pause                     ;
+    JSRR R0                             ;   pause()
+
+    AND R0 R0 #0                        ;
+    BR main_menu_swap_node              ;   # Cambio de nodo (offset = 0)
+
+
+;   ============================================================================
+;   ==- Variables -=============================================================
 
 main_menu_r0                .FILL #0
 main_menu_r1                .FILL #0
@@ -319,13 +355,159 @@ main_menu_r5                .FILL #0
 main_menu_r7                .FILL #0
 main_menu_state_initial     .FILL main_menu_init
 main_menu_state             .FILL #0
-main_menu_prompt_a          .STRINGZ "a > "
-main_menu_text_a            .STRINGZ "a:  "
-main_menu_prompt_b          .STRINGZ "b > "
-main_menu_text_b            .STRINGZ "b:  "
+main_menu_prompt_inta       .FILL main_menu_prompt_inta_text 
+main_menu_prompt_intb       .FILL main_menu_prompt_intb_text 
+main_menu_prompt_int        .FILL main_menu_prompt_int_text  
+main_menu_prompt_q8a        .FILL main_menu_prompt_q8a_text  
+main_menu_prompt_q8b        .FILL main_menu_prompt_q8b_text  
+main_menu_prompt_q8         .FILL main_menu_prompt_q8_text   
+main_menu_prompt_q12a       .FILL main_menu_prompt_q12a_text 
+main_menu_prompt_q12b       .FILL main_menu_prompt_q12b_text 
+main_menu_prompt_q12        .FILL main_menu_prompt_q12_text  
+main_menu_prompt_q14        .FILL main_menu_prompt_q14_text  
+main_menu_prompt_q15a       .FILL main_menu_prompt_q15a_text 
+main_menu_prompt_q15b       .FILL main_menu_prompt_q15b_text 
+main_menu_prompt_q15        .FILL main_menu_prompt_q15_text  
+main_menu_prompt_dq16a      .FILL main_menu_prompt_dq16a_text
+main_menu_prompt_dq16b      .FILL main_menu_prompt_dq16b_text
+main_menu_prompt_dq16       .FILL main_menu_prompt_dq16_text 
+main_menu_8                 .FILL #8
+main_menu_12                .FILL #12
+main_menu_14                .FILL #14
+main_menu_15                .FILL #15
 main_menu_aux_0             .FILL #0
 main_menu_aux_1             .FILL #0
 
+main_menu_swap_node_ads     .FILL main_menu_swap_node
+
+sub_getcfiltered            .FILL GETCFILTERED-GETCFILTERED
+sub_fromhex                 .FILL FROMHEX-FROMHEX
+sub_pause                   .FILL PAUSE-PAUSE
+
+sub_from_qm_n               .FILL FROM_QM_N-FROM_QM_N
+
+sub_getval                  .FILL GETVAL-GETVAL
+sub_getval_int              .FILL GETVAL_INT-GETVAL_INT
+sub_getval_qm_n             .FILL GETVAL_QM_N-GETVAL_QM_N
+sub_outval                  .FILL OUTVAL-OUTVAL
+
+
+;   ==- Controlador subrutinas de dos Q7.8 -====================================
+main_menu_two_q8
+    LD R5 main_menu_state               ;   [R5] nodo = [estado]
+
+    LDR R0 R5 #1                        ;
+    PUTS                                ;   print(nodo.texto)
+
+    LD R0 main_menu_prompt_q8a          ;
+    PUTS                                ;   print("a (Q7.8) > ")
+    LD R0 main_menu_8                   ;
+    LD R2 sub_getval_qm_n               ;
+    JSRR R2                             ;   [R0] = getval_Qm_n(8)
+
+    ST R0 main_menu_aux_0               ;
+
+    LD R0 main_menu_prompt_q8b          ;
+    PUTS                                ;   print("b (Q7.8) > ")
+    LD R0 main_menu_8                   ;
+    LD R2 sub_getval_qm_n               ;
+    JSRR R2                             ;   [R0] = getval_Qm_n(8)
+
+    ADD R1 R0 #0                        ;
+    LD R0 main_menu_aux_0               ;
+
+    LDR R2 R5 #4                        ;
+    LDR R2 R2 #0                        ;
+    JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
+
+    ST R0 main_menu_aux_0               ;
+
+    LD R0 main_menu_prompt_q8           ;
+    PUTS                                ;   print("(Q7.8) ")
+
+    LD R0 main_menu_aux_0               ;
+    LD R1 main_menu_8                   ;
+    LD R2 sub_from_qm_n                 ;
+    JSRR R2                             ;
+    LD R2 sub_outval                    ;
+    JSRR R2                             ;   outval(fromQm_n(result, 8))
+
+    LD R0 sub_pause                     ;
+    JSRR R0                             ;   pause()
+
+    AND R0 R0 #0                        ;
+    LD R1 main_menu_swap_node_ads       ;
+    JMP R1                              ;   # Cambio de nodo (offset = 0)
+
+
+;   ==- Controlador subrutinas de dos Q0.15 -===================================
+main_menu_two_q15
+    LD R5 main_menu_state               ;   [R5] nodo = [estado]
+
+    LDR R0 R5 #1                        ;
+    PUTS                                ;   print(nodo.texto)
+
+    LD R0 main_menu_prompt_q15a         ;
+    PUTS                                ;   print("a (Q0.15) > ")
+    LD R0 main_menu_15                  ;
+    LD R2 sub_getval_qm_n               ;
+    JSRR R2                             ;   [R0] = getval_Qm_n(15)
+
+    ST R0 main_menu_aux_0               ;
+
+    LD R0 main_menu_prompt_q15b         ;
+    PUTS                                ;   print("b (Q0.15) > ")
+    LD R0 main_menu_15                  ;
+    LD R2 sub_getval_qm_n               ;
+    JSRR R2                             ;   [R0] = getval_Qm_n(15)
+
+    ADD R1 R0 #0                        ;
+    LD R0 main_menu_aux_0               ;
+
+    LDR R2 R5 #4                        ;
+    LDR R2 R2 #0                        ;
+    JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
+
+    ST R0 main_menu_aux_0               ;
+
+    LD R0 main_menu_prompt_q15          ;
+    PUTS                                ;   print("(Q0.15) ")
+
+    LD R0 main_menu_aux_0               ;
+    LD R1 main_menu_15                  ;
+    LD R2 sub_from_qm_n                 ;
+    JSRR R2                             ;
+    LD R2 sub_outval                    ;
+    JSRR R2                             ;   outval(fromQm_n(result, 15))
+
+    LD R0 sub_pause                     ;
+    JSRR R0                             ;   pause()
+
+    AND R0 R0 #0                        ;
+    LD R1 main_menu_swap_node_ads       ;
+    JMP R1                              ;   # Cambio de nodo (offset = 0)
+
+
+
+;   ============================================================================
+;   ==- Prompt texts -==========================================================
+
+main_menu_prompt_inta_text  .STRINGZ " a (int) > "
+main_menu_prompt_intb_text  .STRINGZ " b (int) > "
+main_menu_prompt_int_text   .STRINGZ "(int) "
+main_menu_prompt_q8a_text   .STRINGZ " a (Q7.8) > "
+main_menu_prompt_q8b_text   .STRINGZ " b (Q7.8) > "
+main_menu_prompt_q8_text    .STRINGZ "(Q7.8) "
+main_menu_prompt_q12a_text  .STRINGZ " a (Q3.12) > "
+main_menu_prompt_q12b_text  .STRINGZ " b (Q3.12) > "
+main_menu_prompt_q12_text   .STRINGZ "(Q3.12) "
+main_menu_prompt_q14_text   .STRINGZ "(Q1.14) "
+main_menu_prompt_q15a_text  .STRINGZ " a (Q0.15) > "
+main_menu_prompt_q15b_text  .STRINGZ " b (Q0.15) > "
+main_menu_prompt_q15_text   .STRINGZ "(Q0.15) "
+main_menu_prompt_dq16a_text .STRINGZ " a (Q15.16) > "
+main_menu_prompt_dq16b_text .STRINGZ " b (Q15.16) > "
+main_menu_prompt_dq16_text  .STRINGZ "(Q15.16) "
 
 
 ;   ============================================================================
@@ -360,12 +542,12 @@ main_menu_end               .FILL main_menu_return
                             ; el controlador simplemente es continuar en return).
 
 ;   ============================================================================
-main_menu_mcd               .FILL main_menu_two_integer
+main_menu_mcd               .FILL main_menu_two_int
                             .FILL main_menu_mcd_text
                             .FILL #0
                             .FILL main_menu_mcd_next
                             .FILL main_menu_sub_mcd
-main_menu_mcd_text          .STRINGZ "\n\n==MAXIMO COMUN DIVISOR==\n a (int), b (int)\n"
+main_menu_mcd_text          .STRINGZ "\n\n==MAXIMO COMUN DIVISOR==\n"
 main_menu_mcd_next          .FILL main_menu_init
 
 ;   ============================================================================
@@ -380,37 +562,37 @@ main_menu_sin_next          .FILL main_menu_sin_taylor
                             .FILL main_menu_sin_table
                             .FILL main_menu_sin_chev
 ;   ----------------------------------------------------------------------------
-main_menu_sin_taylor        .FILL main_menu_one_q3_12
+main_menu_sin_taylor        .FILL main_menu_one_q12
                             .FILL main_menu_sin_taylor_text
                             .FILL #0
                             .FILL main_menu_sin_taylor_next
                             .FILL main_menu_sub_sin_taylor
-main_menu_sin_taylor_text   .STRINGZ "\n\n==SENO TRIGONOMETRICO (TAYLOR)==\n a (Q3.12)\n"
+main_menu_sin_taylor_text   .STRINGZ "\n\n==SENO TRIGONOMETRICO (TAYLOR)==\n"
 main_menu_sin_taylor_next   .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_sin_table         .FILL main_menu_one_q3_12
+main_menu_sin_table         .FILL main_menu_one_q12_result_q14
                             .FILL main_menu_sin_table_text
                             .FILL #0
                             .FILL main_menu_sin_table_next
                             .FILL main_menu_sub_sin_table
-main_menu_sin_table_text    .STRINGZ "\n\n==SENO TRIGONOMETRICO (TABLE)==\n a (Q3.12)\n"
+main_menu_sin_table_text    .STRINGZ "\n\n==SENO TRIGONOMETRICO (TABLE)==\n"
 main_menu_sin_table_next    .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_sin_chev          .FILL main_menu_one_q3_12_result_q1_14
+main_menu_sin_chev          .FILL main_menu_one_q12_result_q14
                             .FILL main_menu_sin_chev_text
                             .FILL #0
                             .FILL main_menu_sin_chev_next
                             .FILL main_menu_sub_sin_chev
-main_menu_sin_chev_text     .STRINGZ "\n\n==SENO TRIGONOMETRICO (CHEBYSHEV-PADE)==\n a (Q3.12)\n"
+main_menu_sin_chev_text     .STRINGZ "\n\n==SENO TRIGONOMETRICO (CHEBYSHEV-PADE)==\n"
 main_menu_sin_chev_next     .FILL main_menu_init
 
 ;   ============================================================================
-main_menu_cos               .FILL main_menu_one_q3_12
+main_menu_cos               .FILL main_menu_one_q12_result_q14
                             .FILL main_menu_cos_text
                             .FILL #0
                             .FILL main_menu_cos_next
                             .FILL main_menu_sub_cos
-main_menu_cos_text          .STRINGZ "\n\n==COSENO TRIGONOMETRICO==\n a (Q3.12)\n"
+main_menu_cos_text          .STRINGZ "\n\n==COSENO TRIGONOMETRICO==\n"
 main_menu_cos_next          .FILL main_menu_init
 
 ;   ============================================================================
@@ -424,20 +606,20 @@ main_menu_base_filter       .STRINGZ "01"
 main_menu_base_next         .FILL main_menu_base_hex
                             .FILL main_menu_base_bin
 ;   ----------------------------------------------------------------------------
-main_menu_base_hex          .FILL main_menu_one_integer_noresult
+main_menu_base_hex          .FILL main_menu_one_int_noresult
                             .FILL main_menu_base_hex_text
                             .FILL #0
                             .FILL main_menu_base_hex_next
                             .FILL main_menu_sub_base_hex
-main_menu_base_hex_text     .STRINGZ "\n\n==EXPRESION CON BASE (HEX)==\n a (int)\n"
+main_menu_base_hex_text     .STRINGZ "\n\n==EXPRESION CON BASE (HEX)==\n"
 main_menu_base_hex_next     .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_base_bin          .FILL main_menu_one_integer_noresult
+main_menu_base_bin          .FILL main_menu_one_int_noresult
                             .FILL main_menu_base_bin_text
                             .FILL #0
                             .FILL main_menu_base_bin_next
                             .FILL main_menu_sub_base_bin
-main_menu_base_bin_text     .STRINGZ "\n\n==EXPRESION CON BASE (BIN)==\n a (int)\n"
+main_menu_base_bin_text     .STRINGZ "\n\n==EXPRESION CON BASE (BIN)==\n"
 main_menu_base_bin_next     .FILL main_menu_init
 
 ;   ============================================================================
@@ -451,24 +633,24 @@ main_menu_sqrt_filter       .STRINGZ "01"
 main_menu_sqrt_next         .FILL main_menu_sqrt_nonres
                             .FILL main_menu_sqrt_nr
 ;   ----------------------------------------------------------------------------
-main_menu_sqrt_nonres       .FILL main_menu_one_q7_8
+main_menu_sqrt_nonres       .FILL main_menu_one_q8
                             .FILL main_menu_sqrt_nonres_text
                             .FILL #0
                             .FILL main_menu_sqrt_nonres_next
                             .FILL main_menu_sub_sqrt_nonres
-main_menu_sqrt_nonres_text  .STRINGZ "\n\n==RAIZ CUADRADA (NON RESTORING)==\n a (Q7.8)\n"
+main_menu_sqrt_nonres_text  .STRINGZ "\n\n==RAIZ CUADRADA (NON RESTORING)==\n"
 main_menu_sqrt_nonres_next  .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_sqrt_nr           .FILL main_menu_one_q7_8
+main_menu_sqrt_nr           .FILL main_menu_one_q8
                             .FILL main_menu_sqrt_nr_text
                             .FILL #0
                             .FILL main_menu_sqrt_nr_next
                             .FILL main_menu_sub_sqrt_nr
-main_menu_sqrt_nr_text      .STRINGZ "\n\n==RAIZ CUADRADA (NEWTON-RAPHSON)==\n a (Q7.8)\n"
+main_menu_sqrt_nr_text      .STRINGZ "\n\n==RAIZ CUADRADA (NEWTON-RAPHSON)==\n"
 main_menu_sqrt_nr_next      .FILL main_menu_init
 
 ;   ============================================================================
-main_menu_exp               .FILL main_menu_placeholder
+main_menu_exp               .FILL main_menu_one_int
                             .FILL main_menu_exp_text
                             .FILL #0
                             .FILL main_menu_exp_next
@@ -487,7 +669,7 @@ main_menu_pow_filter        .STRINGZ "01"
 main_menu_pow_next          .FILL main_menu_pow_sumas
                             .FILL main_menu_pow_expbin
 ;   ----------------------------------------------------------------------------
-main_menu_pow_sumas         .FILL main_menu_placeholder
+main_menu_pow_sumas         .FILL main_menu_two_int
                             .FILL main_menu_pow_sumas_text
                             .FILL #0
                             .FILL main_menu_pow_sumas_next
@@ -495,7 +677,7 @@ main_menu_pow_sumas         .FILL main_menu_placeholder
 main_menu_pow_sumas_text    .STRINGZ "\n\n==POTENCIACION (SUMAS SUCESIVAS)==\n"
 main_menu_pow_sumas_next    .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_pow_expbin        .FILL main_menu_placeholder
+main_menu_pow_expbin        .FILL main_menu_two_int
                             .FILL main_menu_pow_expbin_text
                             .FILL #0
                             .FILL main_menu_pow_expbin_next
@@ -515,28 +697,28 @@ main_menu_mult_next         .FILL main_menu_mult_cordic
                             .FILL main_menu_mult_basic
                             .FILL main_menu_mult_booth
 ;   ----------------------------------------------------------------------------
-main_menu_mult_cordic       .FILL main_menu_two_q7_8
+main_menu_mult_cordic       .FILL main_menu_two_int
                             .FILL main_menu_mult_cordic_text
                             .FILL #0
                             .FILL main_menu_mult_cordic_next
                             .FILL main_menu_sub_mult_cordic
-main_menu_mult_cordic_text  .STRINGZ "\n\n==MULTIPLICACION (CORDIC)==\n a (Q7.8), b (Q7.8)\n"
+main_menu_mult_cordic_text  .STRINGZ "\n\n==MULTIPLICACION (CORDIC)==\n"
 main_menu_mult_cordic_next  .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_mult_basic        .FILL main_menu_two_q7_8
+main_menu_mult_basic        .FILL main_menu_two_int
                             .FILL main_menu_mult_basic_text
                             .FILL #0
                             .FILL main_menu_mult_basic_next
                             .FILL main_menu_sub_mult_basic
-main_menu_mult_basic_text   .STRINGZ "\n\n==MULTIPLICACION (BASIC)==\n a (Q7.8), b (Q7.8)\n"
+main_menu_mult_basic_text   .STRINGZ "\n\n==MULTIPLICACION (BASIC)==\n"
 main_menu_mult_basic_next   .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_mult_booth        .FILL main_menu_two_q7_8
+main_menu_mult_booth        .FILL main_menu_two_int
                             .FILL main_menu_mult_booth_text
                             .FILL #0
                             .FILL main_menu_mult_booth_next
                             .FILL main_menu_sub_mult_booth
-main_menu_mult_booth_text   .STRINGZ "\n\n==MULTIPLICACION (BOOTH)==\n a (Q7.8), b (Q7.8)\n"
+main_menu_mult_booth_text   .STRINGZ "\n\n==MULTIPLICACION (BOOTH)==\n"
 main_menu_mult_booth_next   .FILL main_menu_init
 
 ;   ============================================================================
@@ -550,42 +732,42 @@ main_menu_div_filter        .STRINGZ "01"
 main_menu_div_next          .FILL main_menu_div_long
                             .FILL main_menu_div_nr
 ;   ----------------------------------------------------------------------------
-main_menu_div_long          .FILL main_menu_two_q7_8
+main_menu_div_long          .FILL main_menu_two_int
                             .FILL main_menu_div_long_text
                             .FILL #0
                             .FILL main_menu_div_long_next
                             .FILL main_menu_sub_div_long
-main_menu_div_long_text     .STRINGZ "\n\n==DIVISION (LONG DIVISION)==\n a (Q7.8), b (Q7.8)\n"
+main_menu_div_long_text     .STRINGZ "\n\n==DIVISION (LONG DIVISION)==\n"
 main_menu_div_long_next     .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_div_nr            .FILL main_menu_two_q7_8
+main_menu_div_nr            .FILL main_menu_two_int
                             .FILL main_menu_div_nr_text
                             .FILL #0
                             .FILL main_menu_div_nr_next
                             .FILL main_menu_sub_div_nr
-main_menu_div_nr_text       .STRINGZ "\n\n==DIVISION (NEWTON-RAPHSON)==\n a (Q7.8), b (Q7.8)\n"
+main_menu_div_nr_text       .STRINGZ "\n\n==DIVISION (NEWTON-RAPHSON)==\n"
 main_menu_div_nr_next       .FILL main_menu_init
 
 ;   ============================================================================
-main_menu_log               .FILL main_menu_one_q7_8
+main_menu_log               .FILL main_menu_one_q8
                             .FILL main_menu_log_text
                             .FILL #0
                             .FILL main_menu_log_next
                             .FILL main_menu_sub_log
-main_menu_log_text          .STRINGZ "\n\n==LOGARITMO==\n a (Q7.8)\n"
+main_menu_log_text          .STRINGZ "\n\n==LOGARITMO==\n"
 main_menu_log_next          .FILL main_menu_init
 
 ;   ============================================================================
-main_menu_mcm               .FILL main_menu_two_integer
+main_menu_mcm               .FILL main_menu_two_int
                             .FILL main_menu_mcm_text
                             .FILL #0
                             .FILL main_menu_mcm_next
                             .FILL main_menu_sub_mcm
-main_menu_mcm_text          .STRINGZ "\n\n==MINIMO COMUN MULTIPLO==\n a (int), b (int)\n"
+main_menu_mcm_text          .STRINGZ "\n\n==MINIMO COMUN MULTIPLO==\n"
 main_menu_mcm_next          .FILL main_menu_init
 
 ;   ============================================================================
-main_menu_trbilin           .FILL main_menu_placeholder
+main_menu_trbilin           .FILL main_menu_one_q12
                             .FILL main_menu_trbilin_text
                             .FILL #0
                             .FILL main_menu_trbilin_next
@@ -604,7 +786,7 @@ main_menu_cordic_filter     .STRINGZ "01"
 main_menu_cordic_next       .FILL main_menu_cordic_man
                             .FILL main_menu_cordic_atan
 ;   ----------------------------------------------------------------------------
-main_menu_cordic_man        .FILL main_menu_placeholder
+main_menu_cordic_man        .FILL main_menu_one_q12
                             .FILL main_menu_cordic_man_text
                             .FILL #0
                             .FILL main_menu_cordic_man_next
@@ -612,7 +794,7 @@ main_menu_cordic_man        .FILL main_menu_placeholder
 main_menu_cordic_man_text   .STRINGZ "\n\n==CORDIC (ARGUMENTO MANUAL)==\n"
 main_menu_cordic_man_next   .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
-main_menu_cordic_atan       .FILL main_menu_placeholder
+main_menu_cordic_atan       .FILL main_menu_one_q12
                             .FILL main_menu_cordic_atan_text
                             .FILL #0
                             .FILL main_menu_cordic_atan_next
@@ -621,12 +803,12 @@ main_menu_cordic_atan_text  .STRINGZ "\n\n==CORDIC (SERIE ARCTAN)==\n"
 main_menu_cordic_atan_next  .FILL main_menu_init
 
 ;   ============================================================================
-main_menu_qtoq              .FILL main_menu_one_q3_12
+main_menu_qtoq              .FILL main_menu_one_q12_result_q8
                             .FILL main_menu_qtoq_text
                             .FILL #0
                             .FILL main_menu_qtoq_next
                             .FILL main_menu_sub_qtoq
-main_menu_qtoq_text         .STRINGZ "\n\n==Q3.12 -> Q7.8==\n a (Q3.12)\n"
+main_menu_qtoq_text         .STRINGZ "\n\n==Q3.12 -> Q7.8==\n"
 main_menu_qtoq_next         .FILL main_menu_init
 
 
