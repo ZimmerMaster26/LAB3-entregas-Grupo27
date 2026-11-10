@@ -168,6 +168,13 @@ main_menu_one_q8
     LD R2 main_menu_8
     BR main_menu_call
 
+;   ==- Controlador subrutinas de un Q7.8 -=====================================
+main_menu_one_q8_result_q9
+    LD R0 main_menu_8
+    LD R1 main_menu_neg_1
+    LD R2 main_menu_9
+    BR main_menu_call
+
 ;   ==- Controlador subrutinas de dos Q7.8 -====================================
 main_menu_two_q8
     LD R0 main_menu_8
@@ -253,7 +260,7 @@ main_menu_call_exec
     LDR R2 R2 #0                        ;
     JSRR R2                             ;   
     ST R0 main_menu_aux_0               ;
-    ST R0 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
+    ST R1 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
 
 main_menu_call_out                      ;
     LD R0 main_menu_aux_4               ;
@@ -299,6 +306,7 @@ main_menu_prompt_q_vec      .FILL main_menu_prompt_q_text_vec
 main_menu_neg_1             .FILL #-1
 main_menu_0                 .FILL #0
 main_menu_8                 .FILL #8
+main_menu_9                 .FILL #9
 main_menu_12                .FILL #12
 main_menu_14                .FILL #14
 main_menu_15                .FILL #15
@@ -342,6 +350,10 @@ main_menu_call_op
     LD R0 main_menu_op_verbose          ;
     BRz main_menu_call_op_exec          ;
 
+main_menu_call_op_show_title            ;
+    LDR R0 R5 #1                        ;
+    PUTS                                ;   print(nodo.texto)
+
 main_menu_call_op_show1                 ;
     LD R0 main_menu_aux_2               ;
     BRn main_menu_call_op_show2         ;
@@ -381,14 +393,14 @@ main_menu_call_op_exec
     LDR R2 R2 #0                        ;
     JSRR R2                             ;   
     ST R0 main_menu_aux_0               ;
-    ST R0 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
+    ST R1 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
 
     LD R0 main_menu_op_verbose          ;
-    BRz main_menu_call_op_next          ;
+    BRz main_menu_call_op_incr_cursor   ;
 
 main_menu_call_op_show_res              ;
     LD R0 main_menu_aux_4               ;
-    BRn main_menu_call_op_next          ;
+    BRn main_menu_call_op_incr_cursor   ;
 
     LD R0 main_menu_prompt_q_vec        ;
     LD R1 main_menu_aux_4               ;
@@ -402,29 +414,31 @@ main_menu_call_op_show_res              ;
     LD R3 sub_outval                    ;
     JSRR R3                             ;   outval(resultado, n_salida)
 
-main_menu_call_op_next                  ;
-    AND R0 R0 #0                        ;
-    LD R1 main_menu_aux_2               ;
-    BRn main_menu_call_op_next_sk1      ;
-    ADD R0 R0 #1                        ;
-    ADD R1 R1 #-16                      ;
-    BRnp main_menu_call_op_next_sk1     ;
-    ADD R0 R0 #1                        ;
+main_menu_call_op_incr_cursor           ;
+    LD R0 main_menu_aux_2               ;
+    BRn main_menu_call_op_next_sk1      ;   if n_entrada1 >= 0:
+    ADD R4 R4 #1                        ;       cursor_de_op.incr()
+    ADD R0 R0 #-16                      ;
+    BRnp main_menu_call_op_next_sk1     ;       if n_entrada1 == 16:
+    ADD R4 R4 #1                        ;           cursor_de_op.incr()
 main_menu_call_op_next_sk1              ;
-    LD R1 main_menu_aux_3               ;
-    BRn main_menu_call_op_next_sk2      ;
-    ADD R0 R0 #1                        ;
+    LD R0 main_menu_aux_3               ;
+    BRn main_menu_call_op_next_sk2      ;   if n_entrada2 >= 0:
+    ADD R4 R4 #1                        ;       cursor_de_op.incr()
 main_menu_call_op_next_sk2              ;
-    LD R1 main_menu_aux_4               ;
-    BRn main_menu_call_op_next_sk3      ;
-    ADD R0 R0 #1                        ;
-    ADD R1 R1 #-16                      ;
-    BRnp main_menu_call_op_next_sk3     ;
-    ADD R0 R0 #1                        ;
+    LD R0 main_menu_aux_4               ;
+    BRn main_menu_call_op_next_sk3      ;   if n_salida >= 0:
+    LD R1 main_menu_aux_0               ;
+    STR R1 R4 #0                        ;       [resultado_h] = aux_0
+    ADD R4 R4 #1                        ;       cursor_de_op.incr()
+    ADD R0 R0 #-16                      ;
+    BRnp main_menu_call_op_next_sk3     ;       if n_salida == 16:
+    LD R1 main_menu_aux_1               ;
+    STR R1 R4 #0                        ;           [resultado_l] = aux_1
+    ADD R4 R4 #1                        ;           cursor_de_op.incr()
 
 main_menu_call_op_next_sk3              ;
-    ADD R4 R4 R0                        ;
-    ST R4 main_menu_op_cursor           ;
+    ST R4 main_menu_op_cursor           ;   cursor_de_op.incr(contador)
 
     AND R0 R0 #0                        ;
     LD R1 main_menu_swap_node_ads       ; 
@@ -663,7 +677,7 @@ main_menu_sqrt_filter       .STRINGZ "01"
 main_menu_sqrt_next         .FILL main_menu_sqrt_nonres
                             .FILL main_menu_sqrt_nr
 ;   ----------------------------------------------------------------------------
-main_menu_sqrt_nonres       .FILL main_menu_one_q8
+main_menu_sqrt_nonres       .FILL main_menu_one_q8_result_q9
                             .FILL main_menu_sqrt_nonres_text
                             .FILL #0
                             .FILL main_menu_sqrt_nonres_next

@@ -10,15 +10,22 @@ sub_todec       .FILL TODEC-TODEC
 sub_from_qm_n   .FILL FROM_QM_N-FROM_QM_N
 
 
+;   ============================================================================
+;   Subrutina: OUTVAL
+;       Muestra por consola un valor, en un formato especifico.
+;       
+;       El fomrato se especifica con un valor numerico que representa la cantidad
+;       de bits fraccionarios a tomar (Para Qm.n sera el valor de n).
+;       Si el valor es 0, se considera totalmente entero (16 bits enteros), y si 
+;       el valor es 16, se considera un Q15.16 (Que tendra en R0 el entero, y en
+;       R1 el fraccionario).
 ;
-;   Subrutina para mostrar un valor por pantalla en formato decimal.
+;   -> INPUT  [R0] Qn.m , o parte entera (depende del formato).
+;   -> INPUT  [R1] cero, o parte fraccionaria (depende del formato).
+;   -> INPUT  [R2] n .
 ;
-
-OUTVAL
-
-    ; [R0] entero o qm_n
-    ; [R1] fraccion
-    ; [R2] n .
+;   ============================================================================
+OUTVAL                                  ;
 
     ST R0 outval_r0                     ;
     ST R1 outval_r1                     ; 

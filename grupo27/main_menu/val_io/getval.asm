@@ -17,19 +17,23 @@ sub_todec       .FILL TODEC-TODEC
 sub_to_qm_n     .FILL to_qm_n-TO_QM_N
 sub_from_qm_n   .FILL from_qm_n-FROM_QM_N
 
-
+;   ============================================================================
+;   Subrutina: GETVAL
+;       Obtiene un valor por teclado en un formato especifico, mostrando el valor
+;       que se obtubo realmente.
+;       
+;       El fomrato se especifica con un valor numerico que representa la cantidad
+;       de bits fraccionarios a tomar (Para Qm.n sera el valor de n).
+;       Si el valor es 0, se considera totalmente entero (16 bits enteros), y si 
+;       el valor es 16, se considera un Q15.16 (Que tendra en R0 el entero, y en
+;       R1 el fraccionario).
 ;
-;   Subrutina para obtener un valor por teclato en cierto formato, mostrando el valor obtenido entre parentesis.
+;   -> INPUT  [R0] n .
+;   <- OUTPUT [R0] Qn.m obtenido, o parte entera obtenida (depende del formato).
+;   <- OUTPUT [R1] cero, o parte fraccionaria obtenida (depende del formato).
 ;
-
-
-GETVAL
-
-    ; [R0] n .
-
-    ; <- [R0] entero,       o  qm_n
-    ; <- [R1] fraccionario     0
-    
+;   ============================================================================
+GETVAL                                  ;    
     ST R2 getval_r2                     ;
     ST R3 getval_r3                     ;
     ST R4 getval_r4                     ;
@@ -102,7 +106,7 @@ getval_out                              ;
 getval_lbraket      .STRINGZ "[ "
 getval_rbraket      .STRINGZ " ]\n"
 getval_n            .FILL #0
-getval_value_0      .FILL #0      
+getval_value_0      .FILL #0
 getval_value_1      .FILL #0
 getval_r2           .FILL #0
 getval_r3           .FILL #0

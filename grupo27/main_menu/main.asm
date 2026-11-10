@@ -29,5 +29,28 @@ main
     HALT
 
 
+programa_del_menu
+    .FILL   #1      ;   modo verboso (muestra todos los valores por consola)
+    
+    .FILL   #7      ;   MULTIPLICACION
+    .FILL   #2      ;   MULTIPLICACION BOOTH
+    .FILL   x0500   ;   (Q7.8) valor a (5)
+    .FILL   xF400   ;   (Q7.8) valor b (-12)
+    .FILL   #0      ;   (Q7.8) espacio para el resultado.
+    
+    .FILL   #4      ;   SQRT
+    .FILL   #1      ;   SQRT NEWTONRAPHSON
+    .FILL   x0002   ;   
+    .FILL   x0000   ;   (Q15.16 usa 2 WORD) valor a (2.0)
+    .FILL   #0      ;   
+    .FILL   #0      ;   (Q15.16 usa 2 WORD) espacio para resultado.
+
+    .FILL   #2      ;   COS TABLE
+    .FILL   x1921   ;   (Q3.12) valor a (1.5708)
+    .FILL   #0      ;   (Q1.14) espacio para el resultado.
+
+    .FILL   #14     ;   SALIR
+
+
 
 .END

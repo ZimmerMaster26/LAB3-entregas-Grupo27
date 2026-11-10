@@ -7,7 +7,7 @@ sub_circlsh     .FILL CIRCLSH-CIRCLSH
 
 ;   ============================================================================
 ;   Subrutina: TO_QM_N
-;       Convierte entre distintos formatos Q.
+;       Convierte entre distintos formatos Q (De Q15.16 a Qm.n).
 ;   
 ;   -> INPUT  [R0] Parte entera del Q15.16 . 
 ;   -> INPUT  [R1] Parte fraccionaria del Q15.16 .

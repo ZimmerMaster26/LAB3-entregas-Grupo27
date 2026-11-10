@@ -168,6 +168,13 @@ main_menu_one_q8
     LD R2 main_menu_8
     BR main_menu_call
 
+;   ==- Controlador subrutinas de un Q7.8 -=====================================
+main_menu_one_q8_result_q9
+    LD R0 main_menu_8
+    LD R1 main_menu_neg_1
+    LD R2 main_menu_9
+    BR main_menu_call
+
 ;   ==- Controlador subrutinas de dos Q7.8 -====================================
 main_menu_two_q8
     LD R0 main_menu_8
@@ -299,6 +306,7 @@ main_menu_prompt_q_vec      .FILL main_menu_prompt_q_text_vec
 main_menu_neg_1             .FILL #-1
 main_menu_0                 .FILL #0
 main_menu_8                 .FILL #8
+main_menu_9                 .FILL #9
 main_menu_12                .FILL #12
 main_menu_14                .FILL #14
 main_menu_15                .FILL #15
@@ -342,6 +350,10 @@ main_menu_call_op
     LD R0 main_menu_op_verbose          ;
     BRz main_menu_call_op_exec          ;
 
+main_menu_call_op_show_title            ;
+    LDR R0 R5 #1                        ;
+    PUTS                                ;   print(nodo.texto)
+
 main_menu_call_op_show1                 ;
     LD R0 main_menu_aux_2               ;
     BRn main_menu_call_op_show2         ;
@@ -384,11 +396,11 @@ main_menu_call_op_exec
     ST R1 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
 
     LD R0 main_menu_op_verbose          ;
-    BRz main_menu_call_op_next          ;
+    BRz main_menu_call_op_incr_cursor   ;
 
 main_menu_call_op_show_res              ;
     LD R0 main_menu_aux_4               ;
-    BRn main_menu_call_op_next          ;
+    BRn main_menu_call_op_incr_cursor   ;
 
     LD R0 main_menu_prompt_q_vec        ;
     LD R1 main_menu_aux_4               ;
@@ -402,29 +414,31 @@ main_menu_call_op_show_res              ;
     LD R3 sub_outval                    ;
     JSRR R3                             ;   outval(resultado, n_salida)
 
-main_menu_call_op_next                  ;
-    AND R0 R0 #0                        ;
-    LD R1 main_menu_aux_2               ;
-    BRn main_menu_call_op_next_sk1      ;
-    ADD R0 R0 #1                        ;
-    ADD R1 R1 #-16                      ;
-    BRnp main_menu_call_op_next_sk1     ;
-    ADD R0 R0 #1                        ;
+main_menu_call_op_incr_cursor           ;
+    LD R0 main_menu_aux_2               ;
+    BRn main_menu_call_op_next_sk1      ;   if n_entrada1 >= 0:
+    ADD R4 R4 #1                        ;       cursor_de_op.incr()
+    ADD R0 R0 #-16                      ;
+    BRnp main_menu_call_op_next_sk1     ;       if n_entrada1 == 16:
+    ADD R4 R4 #1                        ;           cursor_de_op.incr()
 main_menu_call_op_next_sk1              ;
-    LD R1 main_menu_aux_3               ;
-    BRn main_menu_call_op_next_sk2      ;
-    ADD R0 R0 #1                        ;
+    LD R0 main_menu_aux_3               ;
+    BRn main_menu_call_op_next_sk2      ;   if n_entrada2 >= 0:
+    ADD R4 R4 #1                        ;       cursor_de_op.incr()
 main_menu_call_op_next_sk2              ;
-    LD R1 main_menu_aux_4               ;
-    BRn main_menu_call_op_next_sk3      ;
-    ADD R0 R0 #1                        ;
-    ADD R1 R1 #-16                      ;
-    BRnp main_menu_call_op_next_sk3     ;
-    ADD R0 R0 #1                        ;
+    LD R0 main_menu_aux_4               ;
+    BRn main_menu_call_op_next_sk3      ;   if n_salida >= 0:
+    LD R1 main_menu_aux_0               ;
+    STR R1 R4 #0                        ;       [resultado_h] = aux_0
+    ADD R4 R4 #1                        ;       cursor_de_op.incr()
+    ADD R0 R0 #-16                      ;
+    BRnp main_menu_call_op_next_sk3     ;       if n_salida == 16:
+    LD R1 main_menu_aux_1               ;
+    STR R1 R4 #0                        ;           [resultado_l] = aux_1
+    ADD R4 R4 #1                        ;           cursor_de_op.incr()
 
 main_menu_call_op_next_sk3              ;
-    ADD R4 R4 R0                        ;
-    ST R4 main_menu_op_cursor           ;
+    ST R4 main_menu_op_cursor           ;   cursor_de_op.incr(contador)
 
     AND R0 R0 #0                        ;
     LD R1 main_menu_swap_node_ads       ; 
@@ -663,7 +677,7 @@ main_menu_sqrt_filter       .STRINGZ "01"
 main_menu_sqrt_next         .FILL main_menu_sqrt_nonres
                             .FILL main_menu_sqrt_nr
 ;   ----------------------------------------------------------------------------
-main_menu_sqrt_nonres       .FILL main_menu_one_q8
+main_menu_sqrt_nonres       .FILL main_menu_one_q8_result_q9
                             .FILL main_menu_sqrt_nonres_text
                             .FILL #0
                             .FILL main_menu_sqrt_nonres_next
@@ -853,12 +867,12 @@ main_menu_qtoq_next         .FILL main_menu_init
 .EXTERNAL g6_EXP-EXP_Q3_12                                      ; EXP (Q12 -> Q8)
 .EXTERNAL g7_mcm-MCM                                            ; MCM (int, int -> int)
 .EXTERNAL g7_mcd-MCD                                            ; MCD (int, int -> int)
-; [GRUPO 8 SIMULADOR]
+; [GRUPO 8 SIMULADOR]                                           ;
 .EXTERNAL g9_sqrt_nr_dq16-SQRT_NR_DQ16                          ; SQRT NEWTONRAPHSON (DQ16 -> DQ16)
 .EXTERNAL g10_division_larga-DIV_LONG                           ; DIV LONG (Q8, Q8 -> Q8)
 .EXTERNAL g11_CORDICLog-CORDIC_LOG_BASE                         ; CORDIC ATAN (CORDIC LN) (Q12 -> Q12)
 .EXTERNAL g12_subrutina_grupo_12-DIV_NEWTON                     ; DIV NEWTONRAPHSON (Q8, Q8 -> Q8)
-;.EXTERNAL g14_log_borchardt_q8_7-LN_GENERAL_Q8_7                ; LOG (LN BORCHARDT) (Q8 -> Q8) (?) ERROR: el modulo esta solo en github
+.EXTERNAL g14_log_borchardt_q8_7-LN_GENERAL_Q8_7                ; LOG (LN BORCHARDT) (Q8 -> Q8)
 .EXTERNAL g15_G15_Q312_Q78-G15_Q312_Q78                         ; Q3.12 to Q7.8 (Q12 -> Q8)
 .EXTERNAL g18_booth-MULT_BOOTH                                  ; MULT BOOTH (Q8, Q8 -> Q8)
 .EXTERNAL g19_cordic_multiplicacion-CORDIC_MUL                  ; MULT CORDIC (Q8, Q8 -> Q8)
@@ -866,10 +880,10 @@ main_menu_qtoq_next         .FILL main_menu_init
 ;.EXTERNAL g21_                                                  ; SIN TAYLOR (Q12 -> ? ) (?) ERROR: no hay subrutina? (esta el programa, pero no como subrutina)
 ;.EXTERNAL g22_                                                  ; SIN TABLE (Q14? -> Q14)
 ;.EXTERNAL g22_                                                  ; COS TABLE (Q14? -> Q14) (?) ERROR: (no estan por separados en subrutinas diferentes sen y cos? usan Q14 para entrada, entonces aceptan solo de -2 hasta 1.999 como angulo?)
-;.EXTERNAL g23_sqrt_nr-SQRT_NR                                   ; SQRT NONRES (Q8, (k?) -> Q9) (?) ERROR: tienen una entrada para k? el modulo esta solo en github
+.EXTERNAL g23_modulo_sqrt_nr-SQRT_NR                            ; SQRT NONRES (Q8 -> Q9)
 ;.EXTERNAL g24_                                                  ; BASE HEX (int -> noresult)
 ;.EXTERNAL g24_                                                  ; BASE BIN (int -> noresult) (?) ERROR: no hay subrutinas? (esta el programa, pero no como subrutina)
-; [GRUPO 27 MAIN MENU]
+; [GRUPO 27 MAIN MENU]                                          ;
 .EXTERNAL g30_seno_cheb_pade-SEN_CHEB_PADE                      ; SIN CHEBYSHEV-PADE (Q12 -> Q14)
 
 main_menu_sub_mult_cordic   .FILL g19_cordic_multiplicacion-CORDIC_MUL
@@ -877,8 +891,8 @@ main_menu_sub_mult_basic    .FILL NULL_SUBRUTINE        ; g3_MultiplicacionSHIFT
 main_menu_sub_mult_booth    .FILL g18_booth-MULT_BOOTH
 main_menu_sub_div_long      .FILL g10_division_larga-DIV_LONG
 main_menu_sub_div_nr        .FILL g12_subrutina_grupo_12-DIV_NEWTON
-main_menu_sub_log           .FILL NULL_SUBRUTINE        ; g14_log_borchardt_q8_7-LN_GENERAL_Q8_7
-main_menu_sub_sqrt_nonres   .FILL NULL_SUBRUTINE        ; <- SQRT_NONRES
+main_menu_sub_log           .FILL g14_log_borchardt_q8_7-LN_GENERAL_Q8_7
+main_menu_sub_sqrt_nonres   .FILL g23_modulo_sqrt_nr-SQRT_NR
 main_menu_sub_sqrt_nr       .FILL g9_sqrt_nr_dq16-SQRT_NR_DQ16
 main_menu_sub_exp           .FILL g6_EXP-EXP_Q3_12
 main_menu_sub_pow_mults     .FILL NULL_SUBRUTINE        ; <- POW_MULTS
