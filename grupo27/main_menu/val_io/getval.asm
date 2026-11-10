@@ -12,6 +12,11 @@ sub_getline     .FILL GETLINE-GETLINE
 sub_fromdec     .FILL FROMDEC-FROMDEC
 sub_todec       .FILL TODEC-TODEC
 
+.EXTERNAL to_qm_n-TO_QM_N
+.EXTERNAL from_qm_n-FROM_QM_N
+sub_to_qm_n     .FILL to_qm_n-TO_QM_N
+sub_from_qm_n   .FILL from_qm_n-FROM_QM_N
+
 
 ;
 ;   Subrutina para obtener un valor por teclato en cierto formato, mostrando el valor obtenido entre parentesis.
@@ -20,23 +25,58 @@ sub_todec       .FILL TODEC-TODEC
 
 GETVAL
 
+    ; [R0] n .
+
+    ; <- [R0] entero,       o  qm_n
+    ; <- [R1] fraccionario     0
+    
     ST R2 getval_r2                     ;
     ST R3 getval_r3                     ;
     ST R4 getval_r4                     ;
     ST R5 getval_r5                     ;
     ST R7 getval_r7                     ;
 
+    ST R0 getval_n                      ;
+    
     LD R0 ext_buffer                    ;
     LD R1 ext_buffer_end                ;
     LD R2 sub_getline                   ;
     JSRR R2                             ;   [R0] buffer = getline()
 
     LD R2 sub_fromdec                   ;
-    JSRR R2                             ;   [R0, R1, R5] = [entero, decimal, errores]
+    JSRR R2                             ;   [R0, R1, R5] = [entero, fraccion, errores]
 
-    ST R0 getval_entero                 ;
-    ST R1 getval_decimal                ;
+getval_get_int                          ;
+    LD R2 getval_n                      ;
+    BRnp getval_get_dq16                ;   if n == 0:
+    ADD R1 R1 #0                        ;
+    BRzp getval_get_int_sk1             ;
+    ADD R0 R0 #1                        ;
+getval_get_int_sk1                      ;
+    AND R1 R1 #0                        ;       fraccion = 0
+    ST R0 getval_value_0                ;       [value_0] = entero
+    ST R1 getval_value_1                ;       [value_1] = 0
+    BR getval_out                       ;
 
+getval_get_dq16                         ;   
+    ADD R2 R2 #-16                      ;
+    BRnp getval_get_qnm                 ;   elif n == 16:
+    ST R0 getval_value_0                ;       [value_0] = entero
+    ST R1 getval_value_1                ;       [value_1] = fraccion
+    BR getval_out                       ;
+
+getval_get_qnm                          ;   else:
+    LD R2 getval_n                      ;
+    LD R3 sub_to_qm_n                   ;
+    JSRR R3                             ;       [R0] qm_n = to_Qm_n(entero, fraccion, n)
+    AND R1 R1 #0                        ;       fraccion = 0
+    ST R0 getval_value_0                ;       [value_0] = qm_n
+    ST R1 getval_value_1                ;       [value_1] = 0
+    LD R1 getval_n                      ;
+    LD R2 sub_from_qm_n                 ;   
+    JSRR R2                             ;       [R0, R1] = from_Qm_n(qm_n, n)
+
+getval_out                              ;
     LD R2 ext_buffer                    ;
     AND R3 R3 #0                        ;   # (R3 = formato)
     LD R4 sub_todec                     ;
@@ -49,8 +89,8 @@ GETVAL
     LEA R0 getval_rbraket               ;
     PUTS                                ;   print("(" + buffer + ")\n")
 
-    LD R0 getval_entero                 ;
-    LD R1 getval_decimal                ;
+    LD R0 getval_value_0                ;
+    LD R1 getval_value_1                ;
     LD R2 getval_r2                     ;
     LD R3 getval_r3                     ;
     LD R4 getval_r4                     ;
@@ -59,15 +99,16 @@ GETVAL
     RET                                 ;
 
 
-getval_lbraket  .STRINGZ "[ "
-getval_rbraket  .STRINGZ " ]\n"
-getval_entero   .FILL #0
-getval_decimal  .FILL #0
-getval_r2       .FILL #0
-getval_r3       .FILL #0
-getval_r4       .FILL #0
-getval_r5       .FILL #0
-getval_r7       .FILL #0
+getval_lbraket      .STRINGZ "[ "
+getval_rbraket      .STRINGZ " ]\n"
+getval_n            .FILL #0
+getval_value_0      .FILL #0      
+getval_value_1      .FILL #0
+getval_r2           .FILL #0
+getval_r3           .FILL #0
+getval_r4           .FILL #0
+getval_r5           .FILL #0
+getval_r7           .FILL #0
 
 
 .END

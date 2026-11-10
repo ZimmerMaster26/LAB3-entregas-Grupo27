@@ -22,8 +22,10 @@ sub_main_menu       .FILL MAIN_MENU-MAIN_MENU
 ;sub_main_menu       .FILL MAIN_MENU_PROGRESO-MAIN_MENU
 
 main
-    LD R0 sub_main_menu
-    JSRR R0
+
+    AND R0 R0 #0
+    LD R1 sub_main_menu
+    JSRR R1
     HALT
 
 

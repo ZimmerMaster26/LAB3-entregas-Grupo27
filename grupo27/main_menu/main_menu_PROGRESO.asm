@@ -7,8 +7,6 @@
 .EXTERNAL FROM_QM_N-FROM_QM_N
 
 .EXTERNAL GETVAL-GETVAL         
-.EXTERNAL GETVAL_INT-GETVAL_INT 
-.EXTERNAL GETVAL_QM_N-GETVAL_QM_N   
 .EXTERNAL OUTVAL-OUTVAL
 
 
@@ -35,6 +33,16 @@
 ;       (No todos los controladores utilizan todos los datos, por ejemplo el
 ;       controlador de menus utiliza todos menos la Subrutina, el de obtener un decimal
 ;       y llamar a subrutina utiliza todos menos el filtro, etc.)
+;
+;   -> INPUT  [R0] nullptr (x0000) o puntero a vector de operaciones.
+;
+;       Si la entrada es nullptr, se ejecutara el menu con las entradas por teclado con
+;       normalidad.
+;       Un vector de operaciones consiste de datos de memoria que se ejecutaran como
+;       opearaciones del menu (seleccionar operacion, dato_a, dato_b, etc...).
+;       Se espera que el primer dato sea la bandera de verbosidad (0, para modo silencioso
+;       y 1 para modo verboso).
+;
 ;   ============================================================================
 
 MAIN_MENU                               ;
@@ -45,6 +53,19 @@ MAIN_MENU                               ;
     ST R4 main_menu_r4                  ;
     ST R5 main_menu_r5                  ;
     ST R7 main_menu_r7                  ;
+
+    AND R1 R1 #0                        ;
+    ADD R1 R1 #1                        ;
+    ST R1 main_menu_op_verbose          ;   [verbose_op] = 1
+    
+    ADD R0 R0 #0                        ;
+    BRz main_menu_sk1                   ;   if cursor_de_op:
+    LDR R1 R0 #0                        ;       
+    ST R1 main_menu_op_verbose          ;       [verbose_op] = cursor_de_op.peek()
+    ADD R0 R0 #1                        ;       cursor_de_op.incr()
+
+main_menu_sk1
+    ST R0 main_menu_op_cursor           ;   [cursor_de_op] = cursor_de_op
 
     LD R0 main_menu_state_initial       ;   
     ST R0 main_menu_state               ;   [estado] = init
@@ -78,6 +99,14 @@ main_menu_return                        ;
 
 ;   ==- Controlador para mostrar menus -========================================
 main_menu_show_menu                     ;
+    LD R1 main_menu_op_cursor           ;
+    BRz main_menu_show_menu_sk1         ;   if [cursor_de_op]:
+    LDR R0 R1 #0                        ;       [R0] valor
+    ADD R1 R1 #1                        ;
+    ST R1 main_menu_op_cursor           ;       [cursor_de_op].incr()
+    BR main_menu_swap_node              ;       # Cambio de nodo (offset = valor)
+
+main_menu_show_menu_sk1
     LD R5 main_menu_state               ;   [R5] nodo = [estado]
     LDR R0 R5 #1                        ;  
     PUTS                                ;   print(nodo.texto)
@@ -99,243 +128,150 @@ main_menu_show_menu                     ;
 
 ;   ==- Controlador subrutinas de un entero (no muestra resultado) -============
 main_menu_one_int_noresult
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LD R0 main_menu_prompt_inta         ;
-    PUTS                                ;   print(" a (int) > ")
-
-    LD R2 sub_getval_int                ;
-    JSRR R2                             ;   [R0] = getval_int()
-
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   node.subrutina(value_a)
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    BR main_menu_swap_node              ;   swap_node(offset = 0)
-
-
-;   ==- Controlador subrutinas de un entero  -==================================
-main_menu_one_int
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LD R0 main_menu_prompt_inta         ;
-    PUTS                                ;   print(" a (int) > ")
-    LD R0 sub_getval_int                ;
-    JSRR R0                             ;   [R0] = getval_int()
-
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a)
-
-    ST R0 main_menu_aux_0               ;
-
-    LD R0 main_menu_prompt_int          ;
-    PUTS                                ;   print("(int) ")
-
-    LD R0 main_menu_aux_0               ;
-    AND R1 R1 #0                        ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(result)
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    BR main_menu_swap_node              ;   swap_node(offset = 0)
-
+    AND R0 R0 #0
+    LD R1 main_menu_neg_1
+    LD R2 main_menu_neg_1
+    BR main_menu_call
 
 ;   ==- Controlador subrutinas de dos enteros  -================================
 main_menu_two_int
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LD R0 main_menu_prompt_inta         ;
-    PUTS                                ;   print(" a (int) > ")
-    LD R0 sub_getval_int                ;
-    JSRR R0                             ;   [R0] = getval_int()
-
-    ST R0 main_menu_aux_0               ;
-
-    LD R0 main_menu_prompt_intb         ;
-    PUTS                                ;   print(" b (int) > ")
-    LD R0 sub_getval_int                ;
-    JSRR R0                             ;   [R0] = getval_int()
-
-    ADD R1 R0 #0                        ;
-    LD R0 main_menu_aux_0               ;
-
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
-
-    ST R0 main_menu_aux_0               ;
-
-    LD R0 main_menu_prompt_int          ;
-    PUTS                                ;   print("(int) ")
-
-    LD R0 main_menu_aux_0               ;
-    AND R1 R1 #0                        ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(result)
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    BR main_menu_swap_node              ;   swap_node(offset = 0)
-
+    AND R0 R0 #0
+    AND R1 R1 #0
+    AND R2 R2 #0
+    BR main_menu_call
 
 ;   ==- Controlador subrutinas de un Q3.12 -====================================
 main_menu_one_q12
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LD R0 main_menu_prompt_q12a         ;
-    PUTS                                ;   print("a (Q3.12) > ")
-    LD R0 main_menu_12                  ;
-    LD R2 sub_getval_qm_n               ;
-    JSRR R2                             ;   [R0] = getval_Qm_n(12)
-
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a)
-
-    ST R0 main_menu_aux_0               ;
-
-    LD R0 main_menu_prompt_q12          ;
-    PUTS                                ;   print("(Q3.12) ")
-
-    LD R0 main_menu_aux_0               ;
-    LD R1 main_menu_12                  ;
-    LD R2 sub_from_qm_n                 ;
-    JSRR R2                             ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(fromQm_n(result, 12))
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    BR main_menu_swap_node              ;   # Cambio de nodo (offset = 0)
-
+    LD R0 main_menu_12
+    AND R1 R1 #0
+    LD R2 main_menu_12
+    BR main_menu_call
 
 ;   ==- Controlador subrutinas de un Q3.12 con resultado en Q1.14 -=============
 main_menu_one_q12_result_q8
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LD R0 main_menu_prompt_q12a         ;
-    PUTS                                ;   print("a (Q3.12) > ")
-    LD R0 main_menu_12                  ;
-    LD R2 sub_getval_qm_n               ;
-    JSRR R2                             ;   [R0] = getval_Qm_n(12)
-
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a)
-
-    ST R0 main_menu_aux_0               ;
-
-    LD R0 main_menu_prompt_q8           ;
-    PUTS                                ;   print("(Q7.8) ")
-    
-    LD R0 main_menu_aux_0               ;
-    LD R1 main_menu_8                   ;
-    LD R2 sub_from_qm_n                 ;
-    JSRR R2                             ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(fromQm_n(result, 8))
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    BR main_menu_swap_node              ;   # Cambio de nodo (offset = 0)
-
+    LD R0 main_menu_12
+    LD R1 main_menu_neg_1
+    LD R2 main_menu_8
+    BR main_menu_call
 
 ;   ==- Controlador subrutinas de un Q3.12 con resultado en Q1.14 -=============
 main_menu_one_q12_result_q14
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LD R0 main_menu_prompt_q12a         ;
-    PUTS                                ;   print("a (Q3.12) > ")
-    LD R0 main_menu_12                  ;
-    LD R2 sub_getval_qm_n               ;
-    JSRR R2                             ;   [R0] = getval_Qm_n(12)
-
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a)
-
-    ST R0 main_menu_aux_0               ;
-
-    LD R0 main_menu_prompt_q14          ;
-    PUTS                                ;   print("(Q1.14) ")
-    
-    LD R0 main_menu_aux_0               ;
-    LD R1 main_menu_14                  ;
-    LD R2 sub_from_qm_n                 ;
-    JSRR R2                             ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(fromQm_n(result, 14))
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    BR main_menu_swap_node              ;   # Cambio de nodo (offset = 0)
-
-
-
+    LD R0 main_menu_12
+    LD R1 main_menu_neg_1
+    LD R2 main_menu_14
+    BR main_menu_call
 
 ;   ==- Controlador subrutinas de un Q7.8 -=====================================
 main_menu_one_q8
+    LD R0 main_menu_8
+    LD R1 main_menu_neg_1
+    LD R2 main_menu_8
+    BR main_menu_call
+
+;   ==- Controlador subrutinas de dos Q7.8 -====================================
+main_menu_two_q8
+    LD R0 main_menu_8
+    LD R1 main_menu_8
+    LD R2 main_menu_8
+    BR main_menu_call
+
+;   ==- Controlador subrutinas de dos Q0.15 -===================================
+main_menu_two_q15
+    LD R0 main_menu_15
+    LD R1 main_menu_15
+    LD R2 main_menu_15
+    BR main_menu_call
+
+;   ==- Controlador subrutinas de un DQ15.16 -==================================
+main_menu_one_dq16
+    LD R0 main_menu_16
+    LD R1 main_menu_neg_1
+    LD R2 main_menu_16
+    BR main_menu_call
+
+;   ==- Controlador subrutinas de dor Q7.8 con resultado DQ15.16 -==============
+main_menu_two_q8_result_dq16
+    LD R0 main_menu_8
+    LD R1 main_menu_8
+    LD R2 main_menu_16
+    BR main_menu_call
+
+
+;   ==- Controlador subrutinas -===============================================
+main_menu_call
+;   [R0] n entrada1 (o -1 para saltar)
+;   [R1] n entrada2 (o -1 para saltar)
+;   [R2] n salida   (o -1 para saltar)
+
+    LD R4 main_menu_op_cursor           ;   if [cursor_de_op]:
+    BRnp main_menu_call_op              ;       goto main_menu_call_op
+
+    ST R0 main_menu_aux_2               ;   [aux_2] = n_entrada1
+    ST R1 main_menu_aux_3               ;   [aux_3] = n_entrada2
+    ST R2 main_menu_aux_4               ;   [aux_4] = n_salida
+
     LD R5 main_menu_state               ;   [R5] nodo = [estado]
 
     LDR R0 R5 #1                        ;
     PUTS                                ;   print(nodo.texto)
 
-    LD R0 main_menu_prompt_q8a          ;
-    PUTS                                ;   print("a (Q7.8) > ")
-    LD R0 main_menu_8                   ;
-    LD R2 sub_getval_qm_n               ;
-    JSRR R2                             ;   [R0] = getval_Qm_n(8)
+main_menu_call_get1                     ;
+    LD R0 main_menu_aux_2               ;
+    BRn main_menu_call_get2             ;
 
+    LD R0 main_menu_prompt_qa_vec       ;
+    LD R1 main_menu_aux_2               ;
+    ADD R0 R0 R1                        ;
+    LDR R0 R0 #0                        ;
+    PUTS                                ;   print("a (Q3.12) > ")
+
+    LD R0 main_menu_aux_2               ;
+    LD R1 sub_getval                    ;   
+    JSRR R1                             ;   [R0, R1] getval(aux_2)
+    ST R0 main_menu_aux_0               ;
+    ST R1 main_menu_aux_1               ;   [aux_0, aux_1] = getval(n)
+
+main_menu_call_get2
+    LD R0 main_menu_aux_3               ;
+    BRn main_menu_call_exec             ;
+
+    LD R0 main_menu_prompt_qb_vec       ;
+    LD R1 main_menu_aux_3               ;
+    ADD R0 R0 R1                        ;
+    LDR R0 R0 #0                        ;
+    PUTS                                ;   print("a (Q3.12) > ")
+
+    LD R0 main_menu_aux_3               ;
+    LD R1 sub_getval                    ;
+    JSRR R1                             ;   [R0, R1] = getval(aux_3)
+    ST R0 main_menu_aux_1               ;
+
+main_menu_call_exec
+    LD R0 main_menu_aux_0               ;
+    LD R1 main_menu_aux_1               ;
     LDR R2 R5 #4                        ;
     LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a)
-
+    JSRR R2                             ;   
     ST R0 main_menu_aux_0               ;
+    ST R0 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
 
-    LD R0 main_menu_prompt_q8           ;
-    PUTS                                ;   print("(Q7.8) ")
+main_menu_call_out                      ;
+    LD R0 main_menu_aux_4               ;
+    BRn main_menu_call_next             ;
 
+    LD R0 main_menu_prompt_q_vec        ;
+    LD R1 main_menu_aux_4               ;
+    ADD R0 R0 R1                        ;
+    LDR R0 R0 #0                        ;
+    PUTS                                ;   print("(Q3.12) ")
+    
     LD R0 main_menu_aux_0               ;
-    LD R1 main_menu_8                   ;
-    LD R2 sub_from_qm_n                 ;
-    JSRR R2                             ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(fromQm_n(result, 8))
+    LD R1 main_menu_aux_1               ;   [R0, R1] (entero, fraccion)
+    LD R2 main_menu_aux_4               ;   [R2] n_salida
+    LD R3 sub_outval                    ;
+    JSRR R3                             ;   outval(entero, fraccion, n)
 
+main_menu_call_next
     LD R0 sub_pause                     ;
     JSRR R0                             ;   pause()
 
@@ -353,30 +289,25 @@ main_menu_r3                .FILL #0
 main_menu_r4                .FILL #0
 main_menu_r5                .FILL #0
 main_menu_r7                .FILL #0
+main_menu_op_verbose        .FILL #0
+main_menu_op_cursor         .FILL #0
 main_menu_state_initial     .FILL main_menu_init
 main_menu_state             .FILL #0
-main_menu_prompt_inta       .FILL main_menu_prompt_inta_text 
-main_menu_prompt_intb       .FILL main_menu_prompt_intb_text 
-main_menu_prompt_int        .FILL main_menu_prompt_int_text  
-main_menu_prompt_q8a        .FILL main_menu_prompt_q8a_text  
-main_menu_prompt_q8b        .FILL main_menu_prompt_q8b_text  
-main_menu_prompt_q8         .FILL main_menu_prompt_q8_text   
-main_menu_prompt_q12a       .FILL main_menu_prompt_q12a_text 
-main_menu_prompt_q12b       .FILL main_menu_prompt_q12b_text 
-main_menu_prompt_q12        .FILL main_menu_prompt_q12_text  
-main_menu_prompt_q14        .FILL main_menu_prompt_q14_text  
-main_menu_prompt_q15a       .FILL main_menu_prompt_q15a_text 
-main_menu_prompt_q15b       .FILL main_menu_prompt_q15b_text 
-main_menu_prompt_q15        .FILL main_menu_prompt_q15_text  
-main_menu_prompt_dq16a      .FILL main_menu_prompt_dq16a_text
-main_menu_prompt_dq16b      .FILL main_menu_prompt_dq16b_text
-main_menu_prompt_dq16       .FILL main_menu_prompt_dq16_text 
+main_menu_prompt_qa_vec     .FILL main_menu_prompt_qa_text_vec 
+main_menu_prompt_qb_vec     .FILL main_menu_prompt_qb_text_vec 
+main_menu_prompt_q_vec      .FILL main_menu_prompt_q_text_vec  
+main_menu_neg_1             .FILL #-1
+main_menu_0                 .FILL #0
 main_menu_8                 .FILL #8
 main_menu_12                .FILL #12
 main_menu_14                .FILL #14
 main_menu_15                .FILL #15
+main_menu_16                .FILL #16
 main_menu_aux_0             .FILL #0
 main_menu_aux_1             .FILL #0
+main_menu_aux_2             .FILL #0
+main_menu_aux_3             .FILL #0
+main_menu_aux_4             .FILL #0
 
 main_menu_swap_node_ads     .FILL main_menu_swap_node
 
@@ -387,208 +318,226 @@ sub_pause                   .FILL PAUSE-PAUSE
 sub_from_qm_n               .FILL FROM_QM_N-FROM_QM_N
 
 sub_getval                  .FILL GETVAL-GETVAL
-sub_getval_int              .FILL GETVAL_INT-GETVAL_INT
-sub_getval_qm_n             .FILL GETVAL_QM_N-GETVAL_QM_N
 sub_outval                  .FILL OUTVAL-OUTVAL
 
 
-;   ==- Controlador subrutinas de dos Q7.8 -====================================
-main_menu_two_q8
+;   ==- Controlador subrutinas OPERACION -=====================================
+main_menu_call_op
+;   [R0] n entrada1 (o -1 para saltar)
+;   [R1] n entrada2 (o -1 para saltar)
+;   [R2] n salida   (o -1 para saltar)
+
+    ST R0 main_menu_aux_2               ;   [aux_2] = n_entrada1
+    ST R1 main_menu_aux_3               ;   [aux_3] = n_entrada2
+    ST R2 main_menu_aux_4               ;   [aux_4] = n_salida
+
     LD R5 main_menu_state               ;   [R5] nodo = [estado]
 
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
+    LD R4 main_menu_op_cursor           ;   [R4] cursor_de_op
+    LDR R0 R4 #0                        ;
+    ST R0 main_menu_aux_0               ;   [aux_0] = var_a
+    LDR R0 R4 #1                        ;
+    ST R0 main_menu_aux_1               ;   [aux_1] = var_b     # o basura si es que tomaba solo 1 argumento
 
-    LD R0 main_menu_prompt_q8a          ;
-    PUTS                                ;   print("a (Q7.8) > ")
-    LD R0 main_menu_8                   ;
-    LD R2 sub_getval_qm_n               ;
-    JSRR R2                             ;   [R0] = getval_Qm_n(8)
+    LD R0 main_menu_op_verbose          ;
+    BRz main_menu_call_op_exec          ;
 
-    ST R0 main_menu_aux_0               ;
+main_menu_call_op_show1                 ;
+    LD R0 main_menu_aux_2               ;
+    BRn main_menu_call_op_show2         ;
 
-    LD R0 main_menu_prompt_q8b          ;
-    PUTS                                ;   print("b (Q7.8) > ")
-    LD R0 main_menu_8                   ;
-    LD R2 sub_getval_qm_n               ;
-    JSRR R2                             ;   [R0] = getval_Qm_n(8)
-
-    ADD R1 R0 #0                        ;
+    LD R0 main_menu_prompt_q_vec        ;
+    LD R1 main_menu_aux_2               ;
+    ADD R0 R0 R1                        ;
+    LDR R0 R0 #0                        ;
+    PUTS                                ;   print("(Q3.12) ")
+    
     LD R0 main_menu_aux_0               ;
+    LD R1 main_menu_aux_1               ;   [R0, R1] (entero, fraccion)
+    LD R2 main_menu_aux_2               ;   [R2] n_entrada1
+    LD R3 sub_outval                    ;
+    JSRR R3                             ;   outval(entero, fraccion, n)
 
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
+main_menu_call_op_show2                 ;
+    LD R0 main_menu_aux_3               ;
+    BRn main_menu_call_op_exec          ;
 
-    ST R0 main_menu_aux_0               ;
+    LD R0 main_menu_prompt_q_vec        ;
+    LD R1 main_menu_aux_3               ;
+    ADD R0 R0 R1                        ;
+    LDR R0 R0 #0                        ;
+    PUTS                                ;   print("(Q3.12) ")
+    
+    LD R0 main_menu_aux_1               ;
+    AND R1 R1 #0                        ;   [R0, R1] (entero, 0)    # el value_b nunca puede ser Q15.16
+    LD R2 main_menu_aux_3               ;   [R2] n_entrada1
+    LD R3 sub_outval                    ;
+    JSRR R3                             ;   outval(entero, 0, n)
 
-    LD R0 main_menu_prompt_q8           ;
-    PUTS                                ;   print("(Q7.8) ")
-
-    LD R0 main_menu_aux_0               ;
-    LD R1 main_menu_8                   ;
-    LD R2 sub_from_qm_n                 ;
-    JSRR R2                             ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(fromQm_n(result, 8))
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    LD R1 main_menu_swap_node_ads       ;
-    JMP R1                              ;   # Cambio de nodo (offset = 0)
-
-
-;   ==- Controlador subrutinas de dos Q0.15 -===================================
-main_menu_two_q15
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LD R0 main_menu_prompt_q15a         ;
-    PUTS                                ;   print("a (Q0.15) > ")
-    LD R0 main_menu_15                  ;
-    LD R2 sub_getval_qm_n               ;
-    JSRR R2                             ;   [R0] = getval_Qm_n(15)
-
-    ST R0 main_menu_aux_0               ;
-
-    LD R0 main_menu_prompt_q15b         ;
-    PUTS                                ;   print("b (Q0.15) > ")
-    LD R0 main_menu_15                  ;
-    LD R2 sub_getval_qm_n               ;
-    JSRR R2                             ;   [R0] = getval_Qm_n(15)
-
-    ADD R1 R0 #0                        ;
-    LD R0 main_menu_aux_0               ;
-
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
-
-    ST R0 main_menu_aux_0               ;
-
-    LD R0 main_menu_prompt_q15          ;
-    PUTS                                ;   print("(Q0.15) ")
-
-    LD R0 main_menu_aux_0               ;
-    LD R1 main_menu_15                  ;
-    LD R2 sub_from_qm_n                 ;
-    JSRR R2                             ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(fromQm_n(result, 15))
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    LD R1 main_menu_swap_node_ads       ;
-    JMP R1                              ;   # Cambio de nodo (offset = 0)
-
-
-;   ==- Controlador subrutinas de un DQ15.16 -==================================
-main_menu_one_dq16
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LD R0 main_menu_prompt_dq16a        ;
-    PUTS                                ;   print("a (Q15.16) > ")
-    LD R2 sub_getval                    ;
-    JSRR R2                             ;   [R0] = getval()
-
-    LDR R2 R5 #4                        ;
-    LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
-
-    ST R0 main_menu_aux_0               ;
-    ST R1 main_menu_aux_1               ;
-
-    LD R0 main_menu_prompt_dq16         ;
-    PUTS                                ;   print("(Q15.16) ")
-
+main_menu_call_op_exec
     LD R0 main_menu_aux_0               ;
     LD R1 main_menu_aux_1               ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(result)
-
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
-
-    AND R0 R0 #0                        ;
-    LD R1 main_menu_swap_node_ads       ;
-    JMP R1                              ;   # Cambio de nodo (offset = 0)
-
-
-    ;   ==- Controlador subrutinas de dor Q7.8 con resultado DQ15.16 -==============
-main_menu_two_q8_result_dq16
-    LD R5 main_menu_state               ;   [R5] nodo = [estado]
-
-    LDR R0 R5 #1                        ;
-    PUTS                                ;   print(nodo.texto)
-
-    LD R0 main_menu_prompt_q8a          ;
-    PUTS                                ;   print("a (Q7.8) > ")
-    LD R0 main_menu_8                   ;
-    LD R2 sub_getval_qm_n               ;
-    JSRR R2                             ;   [R0] = getval_Qm_n(8)
-
-    LD R0 main_menu_aux_0               ;
-
-    LD R0 main_menu_prompt_q8b          ;
-    PUTS                                ;   print("b (Q7.8) > ")
-    LD R0 main_menu_8                   ;
-    LD R2 sub_getval_qm_n               ;
-    JSRR R2                             ;   [R0] = getval_Qm_n(8)
-
-    ADD R1 R0 #0                        ;
-    LD R0 main_menu_aux_0               ;
-
     LDR R2 R5 #4                        ;
     LDR R2 R2 #0                        ;
-    JSRR R2                             ;   [R0] result = node.subrutina(value_a, value_b)
-
+    JSRR R2                             ;   
     ST R0 main_menu_aux_0               ;
-    ST R1 main_menu_aux_1               ;
+    ST R0 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
 
-    LD R0 main_menu_prompt_dq16         ;
-    PUTS                                ;   print("(Q15.16) ")
+    LD R0 main_menu_op_verbose          ;
+    BRz main_menu_call_op_next          ;
 
+main_menu_call_op_show_res              ;
+    LD R0 main_menu_aux_4               ;
+    BRn main_menu_call_op_next          ;
+
+    LD R0 main_menu_prompt_q_vec        ;
+    LD R1 main_menu_aux_4               ;
+    ADD R0 R0 R1                        ;
+    LDR R0 R0 #0                        ;
+    PUTS                                ;   print("(Q3.12) ")
+    
     LD R0 main_menu_aux_0               ;
-    LD R1 main_menu_aux_1               ;
-    LD R2 sub_outval                    ;
-    JSRR R2                             ;   outval(result)
+    LD R1 main_menu_aux_1               ;   [R0, R1] resultado      # R1 puede ser basura
+    LD R2 main_menu_aux_4               ;   [R2] n_salida
+    LD R3 sub_outval                    ;
+    JSRR R3                             ;   outval(resultado, n_salida)
 
-    LD R0 sub_pause                     ;
-    JSRR R0                             ;   pause()
+main_menu_call_op_next                  ;
+    AND R0 R0 #0                        ;
+    LD R1 main_menu_aux_2               ;
+    BRn main_menu_call_op_next_sk1      ;
+    ADD R0 R0 #1                        ;
+    ADD R1 R1 #-16                      ;
+    BRnp main_menu_call_op_next_sk1     ;
+    ADD R0 R0 #1                        ;
+main_menu_call_op_next_sk1              ;
+    LD R1 main_menu_aux_3               ;
+    BRn main_menu_call_op_next_sk2      ;
+    ADD R0 R0 #1                        ;
+main_menu_call_op_next_sk2              ;
+    LD R1 main_menu_aux_4               ;
+    BRn main_menu_call_op_next_sk3      ;
+    ADD R0 R0 #1                        ;
+    ADD R1 R1 #-16                      ;
+    BRnp main_menu_call_op_next_sk3     ;
+    ADD R0 R0 #1                        ;
+
+main_menu_call_op_next_sk3              ;
+    ADD R4 R4 R0                        ;
+    ST R4 main_menu_op_cursor           ;
 
     AND R0 R0 #0                        ;
-    LD R1 main_menu_swap_node_ads       ;
+    LD R1 main_menu_swap_node_ads       ; 
     JMP R1                              ;   # Cambio de nodo (offset = 0)
 
 
 ;   ============================================================================
 ;   ==- Prompt texts -==========================================================
 
-main_menu_prompt_inta_text  .STRINGZ " a (int) > "
-main_menu_prompt_intb_text  .STRINGZ " b (int) > "
-main_menu_prompt_int_text   .STRINGZ "(int) "
-main_menu_prompt_q8a_text   .STRINGZ " a (Q7.8) > "
-main_menu_prompt_q8b_text   .STRINGZ " b (Q7.8) > "
-main_menu_prompt_q8_text    .STRINGZ "(Q7.8) "
-main_menu_prompt_q12a_text  .STRINGZ " a (Q3.12) > "
-main_menu_prompt_q12b_text  .STRINGZ " b (Q3.12) > "
-main_menu_prompt_q12_text   .STRINGZ "(Q3.12) "
-main_menu_prompt_q14_text   .STRINGZ "(Q1.14) "
-main_menu_prompt_q15a_text  .STRINGZ " a (Q0.15) > "
-main_menu_prompt_q15b_text  .STRINGZ " b (Q0.15) > "
-main_menu_prompt_q15_text   .STRINGZ "(Q0.15) "
-main_menu_prompt_dq16a_text .STRINGZ " a (Q15.16) > "
-main_menu_prompt_dq16b_text .STRINGZ " b (Q15.16) > "
-main_menu_prompt_dq16_text  .STRINGZ "(Q15.16) "
+
+main_menu_prompt_qa_text_vec    .FILL main_menu_prompt_q0a_text
+                                .FILL main_menu_prompt_q1a_text
+                                .FILL main_menu_prompt_q2a_text
+                                .FILL main_menu_prompt_q3a_text
+                                .FILL main_menu_prompt_q4a_text
+                                .FILL main_menu_prompt_q5a_text
+                                .FILL main_menu_prompt_q6a_text
+                                .FILL main_menu_prompt_q7a_text
+                                .FILL main_menu_prompt_q8a_text
+                                .FILL main_menu_prompt_q9a_text
+                                .FILL main_menu_prompt_q10a_text
+                                .FILL main_menu_prompt_q11a_text
+                                .FILL main_menu_prompt_q12a_text
+                                .FILL main_menu_prompt_q13a_text
+                                .FILL main_menu_prompt_q14a_text
+                                .FILL main_menu_prompt_q15a_text
+                                .FILL main_menu_prompt_q16a_text
+main_menu_prompt_qb_text_vec    .FILL main_menu_prompt_q0b_text
+                                .FILL main_menu_prompt_q1b_text
+                                .FILL main_menu_prompt_q2b_text
+                                .FILL main_menu_prompt_q3b_text
+                                .FILL main_menu_prompt_q4b_text
+                                .FILL main_menu_prompt_q5b_text
+                                .FILL main_menu_prompt_q6b_text
+                                .FILL main_menu_prompt_q7b_text
+                                .FILL main_menu_prompt_q8b_text
+                                .FILL main_menu_prompt_q9b_text
+                                .FILL main_menu_prompt_q10b_text
+                                .FILL main_menu_prompt_q11b_text
+                                .FILL main_menu_prompt_q12b_text
+                                .FILL main_menu_prompt_q13b_text
+                                .FILL main_menu_prompt_q14b_text
+                                .FILL main_menu_prompt_q15b_text
+                                .FILL main_menu_prompt_q16b_text
+main_menu_prompt_q_text_vec     .FILL main_menu_prompt_q0_text
+                                .FILL main_menu_prompt_q1_text
+                                .FILL main_menu_prompt_q2_text
+                                .FILL main_menu_prompt_q3_text
+                                .FILL main_menu_prompt_q4_text
+                                .FILL main_menu_prompt_q5_text
+                                .FILL main_menu_prompt_q6_text
+                                .FILL main_menu_prompt_q7_text
+                                .FILL main_menu_prompt_q8_text
+                                .FILL main_menu_prompt_q9_text
+                                .FILL main_menu_prompt_q10_text
+                                .FILL main_menu_prompt_q11_text
+                                .FILL main_menu_prompt_q12_text
+                                .FILL main_menu_prompt_q13_text
+                                .FILL main_menu_prompt_q14_text
+                                .FILL main_menu_prompt_q15_text
+                                .FILL main_menu_prompt_q16_text
+
+main_menu_prompt_q0a_text       .STRINGZ "a (int) > "
+main_menu_prompt_q1a_text       .STRINGZ "a (Q14.1) > "
+main_menu_prompt_q2a_text       .STRINGZ "a (Q13.2) > "
+main_menu_prompt_q3a_text       .STRINGZ "a (Q12.3) > "
+main_menu_prompt_q4a_text       .STRINGZ "a (Q11.4) > "
+main_menu_prompt_q5a_text       .STRINGZ "a (Q10.5) > "
+main_menu_prompt_q6a_text       .STRINGZ "a (Q9.6) > "
+main_menu_prompt_q7a_text       .STRINGZ "a (Q8.7) > "
+main_menu_prompt_q8a_text       .STRINGZ "a (Q7.8) > "
+main_menu_prompt_q9a_text       .STRINGZ "a (Q6.9) > "
+main_menu_prompt_q10a_text      .STRINGZ "a (Q5.10) > "
+main_menu_prompt_q11a_text      .STRINGZ "a (Q4.11) > "
+main_menu_prompt_q12a_text      .STRINGZ "a (Q3.12) > "
+main_menu_prompt_q13a_text      .STRINGZ "a (Q2.13) > "
+main_menu_prompt_q14a_text      .STRINGZ "a (Q1.14) > "
+main_menu_prompt_q15a_text      .STRINGZ "a (Q0.15) > "
+main_menu_prompt_q16a_text      .STRINGZ "a (Q15.16) > "
+main_menu_prompt_q0b_text       .STRINGZ "b (int) > "   
+main_menu_prompt_q1b_text       .STRINGZ "b (Q14.1) > "
+main_menu_prompt_q2b_text       .STRINGZ "b (Q13.2) > "
+main_menu_prompt_q3b_text       .STRINGZ "b (Q12.3) > "
+main_menu_prompt_q4b_text       .STRINGZ "b (Q11.4) > "
+main_menu_prompt_q5b_text       .STRINGZ "b (Q10.5) > "
+main_menu_prompt_q6b_text       .STRINGZ "b (Q9.6) > "
+main_menu_prompt_q7b_text       .STRINGZ "b (Q8.7) > "
+main_menu_prompt_q8b_text       .STRINGZ "b (Q7.8) > "
+main_menu_prompt_q9b_text       .STRINGZ "b (Q6.9) > "
+main_menu_prompt_q10b_text      .STRINGZ "b (Q5.10) > "
+main_menu_prompt_q11b_text      .STRINGZ "b (Q4.11) > "
+main_menu_prompt_q12b_text      .STRINGZ "b (Q3.12) > "
+main_menu_prompt_q13b_text      .STRINGZ "b (Q2.13) > "
+main_menu_prompt_q14b_text      .STRINGZ "b (Q1.14) > "
+main_menu_prompt_q15b_text      .STRINGZ "b (Q0.15) > "
+main_menu_prompt_q16b_text      .STRINGZ "b (Q15.16) > "
+main_menu_prompt_q0_text        .STRINGZ "(int) " 
+main_menu_prompt_q1_text        .STRINGZ "(Q14.1) "
+main_menu_prompt_q2_text        .STRINGZ "(Q13.2) "
+main_menu_prompt_q3_text        .STRINGZ "(Q12.3) "
+main_menu_prompt_q4_text        .STRINGZ "(Q11.4) "
+main_menu_prompt_q5_text        .STRINGZ "(Q10.5) "
+main_menu_prompt_q6_text        .STRINGZ "(Q9.6) "
+main_menu_prompt_q7_text        .STRINGZ "(Q8.7) "
+main_menu_prompt_q8_text        .STRINGZ "(Q7.8) "
+main_menu_prompt_q9_text        .STRINGZ "(Q6.9) "
+main_menu_prompt_q10_text       .STRINGZ "(Q5.10) "
+main_menu_prompt_q11_text       .STRINGZ "(Q4.11) "
+main_menu_prompt_q12_text       .STRINGZ "(Q3.12) "
+main_menu_prompt_q13_text       .STRINGZ "(Q2.13) "
+main_menu_prompt_q14_text       .STRINGZ "(Q1.14) "
+main_menu_prompt_q15_text       .STRINGZ "(Q0.15) "
+main_menu_prompt_q16_text       .STRINGZ "(Q15.16) "
 
 
 ;   ============================================================================
@@ -745,18 +694,18 @@ main_menu_pow               .FILL main_menu_show_menu
                             .FILL main_menu_pow_filter
                             .FILL main_menu_pow_next
                             .FILL #0
-main_menu_pow_text          .STRINGZ "\n\n==POTENCIACION==\n[0] SUMAS SUCESIVAS\n[1] EXP BINARIA\n"
+main_menu_pow_text          .STRINGZ "\n\n==POTENCIACION==\n[0] MULTIPLICACIONES SUCESIVAS\n[1] EXP BINARIA\n"
 main_menu_pow_filter        .STRINGZ "01"
-main_menu_pow_next          .FILL main_menu_pow_sumas
+main_menu_pow_next          .FILL main_menu_pow_mults
                             .FILL main_menu_pow_expbin
 ;   ----------------------------------------------------------------------------
-main_menu_pow_sumas         .FILL main_menu_two_int
-                            .FILL main_menu_pow_sumas_text
+main_menu_pow_mults         .FILL main_menu_two_int
+                            .FILL main_menu_pow_mults_text
                             .FILL #0
-                            .FILL main_menu_pow_sumas_next
-                            .FILL main_menu_sub_pow_sumas
-main_menu_pow_sumas_text    .STRINGZ "\n\n==POTENCIACION (SUMAS SUCESIVAS)==\n"
-main_menu_pow_sumas_next    .FILL main_menu_init
+                            .FILL main_menu_pow_mults_next
+                            .FILL main_menu_sub_pow_mults
+main_menu_pow_mults_text    .STRINGZ "\n\n==POTENCIACION (MULTIPLICACIONES SUCESIVAS)==\n"
+main_menu_pow_mults_next    .FILL main_menu_init
 ;   ----------------------------------------------------------------------------
 main_menu_pow_expbin        .FILL main_menu_two_int
                             .FILL main_menu_pow_expbin_text
@@ -880,7 +829,7 @@ main_menu_cordic_atan       .FILL main_menu_one_q12
                             .FILL #0
                             .FILL main_menu_cordic_atan_next
                             .FILL main_menu_sub_cordic_atan
-main_menu_cordic_atan_text  .STRINGZ "\n\n==CORDIC (SERIE ARCTAN)==\n"
+main_menu_cordic_atan_text  .STRINGZ "\n\n==CORDIC (SERIE ARCTANH) (CORDIC LN)==\n"
 main_menu_cordic_atan_next  .FILL main_menu_init
 
 ;   ============================================================================
@@ -898,53 +847,53 @@ main_menu_qtoq_next         .FILL main_menu_init
 ;   ==- SUBRUTINAS de las Funciones de la calculadora -=========================
 
 .EXTERNAL g1_cordic_division-CORDIC_DIV                         ; TRANSFORMACION BILINEAL (DIVISION CORDIC) (Q15, Q15 -> Q15)
-.EXTERNAL g3_MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD   ; MULT SHIFT ADD (Q8, Q8 -> DQ16) (?) ERROR: DQ16 big-endian, (aun asi no estoy seguro que este funcionando correctamente)
-;.EXTERNAL g4_                                                   ; POW EXPBIN (? -> ?) (?) ERROR: No es subrutina
-;.EXTERNAL g5_                                                   ; POW SUMAS (?) ERROR: No hay modulos
+;.EXTERNAL g3_MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD   ; MULT SHIFT ADD (Q8, Q8 -> DQ16) (?) ERROR: DQ16 big-endian (usan [entero, decimal] = [R1, R0] en vez de [R0, R1]), (aun asi no estoy seguro que este funcionando correctamente)
+.EXTERNAL g4_potencia-EXP_RAPIDA                                ; POW EXPBIN (int, int -> int)
+;.EXTERNAL g5_                                                   ; POW MULTS (?) ERROR: Esta la subrutina para MULT por sumas sucesivas, pero no POW por multiplicaiones sucesivas.
 .EXTERNAL g6_EXP-EXP_Q3_12                                      ; EXP (Q12 -> Q8)
-;.EXTERNAL g7_mcm-MCM                                            ; MCM (int, int -> int)
-;.EXTERNAL g7_mcd-MCD                                            ; MCD (int, int -> int) ERROR: no hay modulos (si estan en github)
+.EXTERNAL g7_mcm-MCM                                            ; MCM (int, int -> int)
+.EXTERNAL g7_mcd-MCD                                            ; MCD (int, int -> int)
 ; [GRUPO 8 SIMULADOR]
-;.EXTERNAL g9_sqrt_nr_dq16-SQRT_NR_DQ16                          ; SQRT NEWTONRAPHSON (DQ16 -> DQ16) ERROR no esta el modulo (Si esta en github)
-;.EXTERNAL g10_division-DIV_LONG                                 ; DIV LONG (Q8, Q8 -> Q8) (?) ERROR: el modulo correcto esta en github
-;.EXTERNAL g11_cordic_log_subrutina-CORDIC_LOG_BASE              ; CORDIC ATAN (CORDIC LN) (Q12 -> Q12) (?) ERROR: no hay modulos (si estan en github)
+.EXTERNAL g9_sqrt_nr_dq16-SQRT_NR_DQ16                          ; SQRT NEWTONRAPHSON (DQ16 -> DQ16)
+.EXTERNAL g10_division_larga-DIV_LONG                           ; DIV LONG (Q8, Q8 -> Q8)
+.EXTERNAL g11_CORDICLog-CORDIC_LOG_BASE                         ; CORDIC ATAN (CORDIC LN) (Q12 -> Q12)
 .EXTERNAL g12_subrutina_grupo_12-DIV_NEWTON                     ; DIV NEWTONRAPHSON (Q8, Q8 -> Q8)
-;.EXTERNAL g14_log_borchardt_q8_7-LN_GENERAL_Q8_7                ; LOG (LN BORCHARDT) (Q8 -> Q8) (?) ERROR: el modulo esta en github
+;.EXTERNAL g14_log_borchardt_q8_7-LN_GENERAL_Q8_7                ; LOG (LN BORCHARDT) (Q8 -> Q8) (?) ERROR: el modulo esta solo en github
 .EXTERNAL g15_G15_Q312_Q78-G15_Q312_Q78                         ; Q3.12 to Q7.8 (Q12 -> Q8)
-;.EXTERNAL g18_booth-MULT_BOOTH                                  ; MULT BOOTH (Q8, Q8 -> Q8) (?) ERROR: el modulo esta en github
-.EXTERNAL g19_cordic_multiplicacion-CORDIC_MUL                  ; MULT CORDIC (Q8, Q8 -> Q8) (?) ERROR: el resultado queda en R1?
-.EXTERNAL g20_Cordic_reduccion_de_argumento-Reduccion_Argumento ; CORDIC MANUAL (REDUCCION DE ARGUMENTO) (Q12 -> Q12) (?) ERROR: no restaura R3 (callee-saved)
-;.EXTERNAL g21_                                                  ; SIN TAYLOR (Q12 -> ? ) (?) ERROR: no hay subrutina? (en github esta en asembly programa.py?)
-;.EXTERNAL g22_                                                  ; SIN TABLE (Q12 -> Q14)
-;.EXTERNAL g22_                                                  ; COS TABLE (Q12 -> Q14) (?) ERROR: (sin terminar, en progreso, en github...)
-;.EXTERNAL g23_sqrt_nr-SQRT_NR                                   ; SQRT NONRES (Q8, (k?) -> Q9) (?) ERROR: esta en github, tienen una entrada para k?
+.EXTERNAL g18_booth-MULT_BOOTH                                  ; MULT BOOTH (Q8, Q8 -> Q8)
+.EXTERNAL g19_cordic_multiplicacion-CORDIC_MUL                  ; MULT CORDIC (Q8, Q8 -> Q8)
+;.EXTERNAL g20_Cordic_reduccion_de_argumento-Reduccion_Argumento ; CORDIC MANUAL (REDUCCION DE ARGUMENTO) (Q12 -> Q12) (?) ERROR: modifica R3 (callee-saved) 
+;.EXTERNAL g21_                                                  ; SIN TAYLOR (Q12 -> ? ) (?) ERROR: no hay subrutina? (esta el programa, pero no como subrutina)
+;.EXTERNAL g22_                                                  ; SIN TABLE (Q14? -> Q14)
+;.EXTERNAL g22_                                                  ; COS TABLE (Q14? -> Q14) (?) ERROR: (no estan por separados en subrutinas diferentes sen y cos? usan Q14 para entrada, entonces aceptan solo de -2 hasta 1.999 como angulo?)
+;.EXTERNAL g23_sqrt_nr-SQRT_NR                                   ; SQRT NONRES (Q8, (k?) -> Q9) (?) ERROR: tienen una entrada para k? el modulo esta solo en github
 ;.EXTERNAL g24_                                                  ; BASE HEX (int -> noresult)
-;.EXTERNAL g24_                                                  ; BASE BIN (int -> noresult) (?) ERROR: no hay subrutinas compatibles.
+;.EXTERNAL g24_                                                  ; BASE BIN (int -> noresult) (?) ERROR: no hay subrutinas? (esta el programa, pero no como subrutina)
 ; [GRUPO 27 MAIN MENU]
 .EXTERNAL g30_seno_cheb_pade-SEN_CHEB_PADE                      ; SIN CHEBYSHEV-PADE (Q12 -> Q14)
 
 main_menu_sub_mult_cordic   .FILL g19_cordic_multiplicacion-CORDIC_MUL
-main_menu_sub_mult_basic    .FILL g3_MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD
-main_menu_sub_mult_booth    .FILL NULL_SUBRUTINE        ; <- MULT_BOOTH
-main_menu_sub_div_long      .FILL NULL_SUBRUTINE        ; <- DIV_LONG
+main_menu_sub_mult_basic    .FILL NULL_SUBRUTINE        ; g3_MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD
+main_menu_sub_mult_booth    .FILL g18_booth-MULT_BOOTH
+main_menu_sub_div_long      .FILL g10_division_larga-DIV_LONG
 main_menu_sub_div_nr        .FILL g12_subrutina_grupo_12-DIV_NEWTON
-main_menu_sub_log           .FILL NULL_SUBRUTINE        ; <- LOG
+main_menu_sub_log           .FILL NULL_SUBRUTINE        ; g14_log_borchardt_q8_7-LN_GENERAL_Q8_7
 main_menu_sub_sqrt_nonres   .FILL NULL_SUBRUTINE        ; <- SQRT_NONRES
-main_menu_sub_sqrt_nr       .FILL NULL_SUBRUTINE        ; <- SQRT_NEWTONRAPHSON
+main_menu_sub_sqrt_nr       .FILL g9_sqrt_nr_dq16-SQRT_NR_DQ16
 main_menu_sub_exp           .FILL g6_EXP-EXP_Q3_12
-main_menu_sub_pow_sumas     .FILL NULL_SUBRUTINE        ; <- POW_SUMAS
-main_menu_sub_pow_expbin    .FILL NULL_SUBRUTINE        ; <- POW_EXPBIN
+main_menu_sub_pow_mults     .FILL NULL_SUBRUTINE        ; <- POW_MULTS
+main_menu_sub_pow_expbin    .FILL g4_potencia-EXP_RAPIDA
 main_menu_sub_sin_taylor    .FILL NULL_SUBRUTINE        ; <- SIN_TAYLOR
 main_menu_sub_sin_table     .FILL NULL_SUBRUTINE        ; <- SIN_TABLE
 main_menu_sub_sin_cheb      .FILL g30_seno_cheb_pade-SEN_CHEB_PADE
-main_menu_sub_cos           .FILL NULL_SUBRUTINE        ; <- COS
+main_menu_sub_cos           .FILL NULL_SUBRUTINE        ; <- COS_TABLE
 main_menu_sub_base_hex      .FILL NULL_SUBRUTINE        ; <- BASE_HEX
 main_menu_sub_base_bin      .FILL NULL_SUBRUTINE        ; <- BASE_BIN
-main_menu_sub_mcd           .FILL NULL_SUBRUTINE        ; <- MCD
-main_menu_sub_mcm           .FILL NULL_SUBRUTINE        ; <- MCM
+main_menu_sub_mcd           .FILL g7_mcd-MCD
+main_menu_sub_mcm           .FILL g7_mcm-MCM
 main_menu_sub_trbilin       .FILL g1_cordic_division-CORDIC_DIV
-main_menu_sub_cordic_man    .FILL g20_Cordic_reduccion_de_argumento-Reduccion_Argumento
-main_menu_sub_cordic_atan   .FILL NULL_SUBRUTINE        ; <- CORDIC_ARCTAN
+main_menu_sub_cordic_man    .FILL NULL_SUBRUTINE        ; g20_Cordic_reduccion_de_argumento-Reduccion_Argumento
+main_menu_sub_cordic_atan   .FILL g11_CORDICLog-CORDIC_LOG_BASE
 main_menu_sub_qtoq          .FILL g15_G15_Q312_Q78-G15_Q312_Q78
 
 
