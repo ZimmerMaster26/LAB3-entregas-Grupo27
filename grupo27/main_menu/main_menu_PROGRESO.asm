@@ -253,7 +253,7 @@ main_menu_call_exec
     LDR R2 R2 #0                        ;
     JSRR R2                             ;   
     ST R0 main_menu_aux_0               ;
-    ST R0 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
+    ST R1 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
 
 main_menu_call_out                      ;
     LD R0 main_menu_aux_4               ;
@@ -381,7 +381,7 @@ main_menu_call_op_exec
     LDR R2 R2 #0                        ;
     JSRR R2                             ;   
     ST R0 main_menu_aux_0               ;
-    ST R0 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
+    ST R1 main_menu_aux_1               ;   [aux_0, aux_1] result = node.subrutina(value_a, value_b)
 
     LD R0 main_menu_op_verbose          ;
     BRz main_menu_call_op_next          ;
