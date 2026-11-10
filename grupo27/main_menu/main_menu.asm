@@ -143,11 +143,11 @@ main_menu_two_int
 ;   ==- Controlador subrutinas de un Q3.12 -====================================
 main_menu_one_q12
     LD R0 main_menu_12
-    AND R1 R1 #0
+    LD R1 main_menu_neg_1
     LD R2 main_menu_12
     BR main_menu_call
 
-;   ==- Controlador subrutinas de un Q3.12 con resultado en Q1.14 -=============
+;   ==- Controlador subrutinas de un Q3.12 con resultado en Q7.8 -==============
 main_menu_one_q12_result_q8
     LD R0 main_menu_12
     LD R1 main_menu_neg_1
@@ -168,7 +168,7 @@ main_menu_one_q8
     LD R2 main_menu_8
     BR main_menu_call
 
-;   ==- Controlador subrutinas de un Q7.8 -=====================================
+;   ==- Controlador subrutinas de un Q7.8 con resultado en Q6.9 -===============
 main_menu_one_q8_result_q9
     LD R0 main_menu_8
     LD R1 main_menu_neg_1
