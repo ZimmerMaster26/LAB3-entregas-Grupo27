@@ -861,7 +861,7 @@ main_menu_qtoq_next         .FILL main_menu_init
 ;   ==- SUBRUTINAS de las Funciones de la calculadora -=========================
 
 .EXTERNAL g1_cordic_division-CORDIC_DIV                         ; TRANSFORMACION BILINEAL (DIVISION CORDIC) (Q15, Q15 -> Q15)
-;.EXTERNAL g3_MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD   ; MULT SHIFT ADD (Q8, Q8 -> DQ16) (?) ERROR: DQ16 big-endian (usan [entero, decimal] = [R1, R0] en vez de [R0, R1]), (aun asi no estoy seguro que este funcionando correctamente)
+.EXTERNAL g3_MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD   ; MULT SHIFT ADD (Q8, Q8 -> DQ16)
 .EXTERNAL g4_potencia-EXP_RAPIDA                                ; POW EXPBIN (int, int -> int)
 ;.EXTERNAL g5_                                                   ; POW MULTS (?) ERROR: Esta la subrutina para MULT por sumas sucesivas, pero no POW por multiplicaiones sucesivas.
 .EXTERNAL g6_EXP-EXP_Q3_12                                      ; EXP (Q12 -> Q8)
@@ -876,10 +876,10 @@ main_menu_qtoq_next         .FILL main_menu_init
 .EXTERNAL g15_G15_Q312_Q78-G15_Q312_Q78                         ; Q3.12 to Q7.8 (Q12 -> Q8)
 .EXTERNAL g18_booth-MULT_BOOTH                                  ; MULT BOOTH (Q8, Q8 -> Q8)
 .EXTERNAL g19_cordic_multiplicacion-CORDIC_MUL                  ; MULT CORDIC (Q8, Q8 -> Q8)
-;.EXTERNAL g20_Cordic_reduccion_de_argumento-Reduccion_Argumento ; CORDIC MANUAL (REDUCCION DE ARGUMENTO) (Q12 -> Q12) (?) ERROR: modifica R3 (callee-saved) 
+.EXTERNAL g20_Cordic_reduccion_de_argumento-Reduccion_Argumento ; CORDIC MANUAL (REDUCCION DE ARGUMENTO) (Q12 -> Q12)
 ;.EXTERNAL g21_                                                  ; SIN TAYLOR (Q12 -> ? ) (?) ERROR: no hay subrutina? (esta el programa, pero no como subrutina)
-;.EXTERNAL g22_                                                  ; SIN TABLE (Q14? -> Q14)
-;.EXTERNAL g22_                                                  ; COS TABLE (Q14? -> Q14) (?) ERROR: (no estan por separados en subrutinas diferentes sen y cos? usan Q14 para entrada, entonces aceptan solo de -2 hasta 1.999 como angulo?)
+.EXTERNAL g22_Tabla_SIN_y_COS-SENO_TABLA                        ; SIN TABLE (Q12 -> Q14)
+.EXTERNAL g22_Tabla_SIN_y_COS-COSENO_TABLA                      ; COS TABLE (Q12 -> Q14)
 .EXTERNAL g23_modulo_sqrt_nr-SQRT_NR                            ; SQRT NONRES (Q8 -> Q9)
 ;.EXTERNAL g24_                                                  ; BASE HEX (int -> noresult)
 ;.EXTERNAL g24_                                                  ; BASE BIN (int -> noresult) (?) ERROR: no hay subrutinas? (esta el programa, pero no como subrutina)
@@ -887,7 +887,7 @@ main_menu_qtoq_next         .FILL main_menu_init
 .EXTERNAL g30_seno_cheb_pade-SEN_CHEB_PADE                      ; SIN CHEBYSHEV-PADE (Q12 -> Q14)
 
 main_menu_sub_mult_cordic   .FILL g19_cordic_multiplicacion-CORDIC_MUL
-main_menu_sub_mult_basic    .FILL NULL_SUBRUTINE        ; g3_MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD
+main_menu_sub_mult_basic    .FILL g3_MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD
 main_menu_sub_mult_booth    .FILL g18_booth-MULT_BOOTH
 main_menu_sub_div_long      .FILL g10_division_larga-DIV_LONG
 main_menu_sub_div_nr        .FILL g12_subrutina_grupo_12-DIV_NEWTON
@@ -898,15 +898,15 @@ main_menu_sub_exp           .FILL g6_EXP-EXP_Q3_12
 main_menu_sub_pow_mults     .FILL NULL_SUBRUTINE        ; <- POW_MULTS
 main_menu_sub_pow_expbin    .FILL g4_potencia-EXP_RAPIDA
 main_menu_sub_sin_taylor    .FILL NULL_SUBRUTINE        ; <- SIN_TAYLOR
-main_menu_sub_sin_table     .FILL NULL_SUBRUTINE        ; <- SIN_TABLE
+main_menu_sub_sin_table     .FILL g22_Tabla_SIN_y_COS-SENO_TABLA
 main_menu_sub_sin_cheb      .FILL g30_seno_cheb_pade-SEN_CHEB_PADE
-main_menu_sub_cos           .FILL NULL_SUBRUTINE        ; <- COS_TABLE
+main_menu_sub_cos           .FILL g22_Tabla_SIN_y_COS-COSENO_TABLA
 main_menu_sub_base_hex      .FILL NULL_SUBRUTINE        ; <- BASE_HEX
 main_menu_sub_base_bin      .FILL NULL_SUBRUTINE        ; <- BASE_BIN
 main_menu_sub_mcd           .FILL g7_mcd-MCD
 main_menu_sub_mcm           .FILL g7_mcm-MCM
 main_menu_sub_trbilin       .FILL g1_cordic_division-CORDIC_DIV
-main_menu_sub_cordic_man    .FILL NULL_SUBRUTINE        ; g20_Cordic_reduccion_de_argumento-Reduccion_Argumento
+main_menu_sub_cordic_man    .FILL g20_Cordic_reduccion_de_argumento-Reduccion_Argumento
 main_menu_sub_cordic_atan   .FILL g11_CORDICLog-CORDIC_LOG_BASE
 main_menu_sub_qtoq          .FILL g15_G15_Q312_Q78-G15_Q312_Q78
 
