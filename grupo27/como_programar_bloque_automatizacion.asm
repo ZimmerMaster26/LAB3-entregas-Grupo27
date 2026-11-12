@@ -64,4 +64,4 @@ programa_del_menu
     .FILL   x1921   ;   (Q3.12) valor a (1.5708)
     .FILL   #0      ;   (Q1.14) espacio para el resultado.
 
-    .FILL   #14     ;   SALIR
+    .FILL   #13     ;   SALIR
