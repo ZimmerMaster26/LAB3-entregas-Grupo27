@@ -562,9 +562,9 @@ main_menu_init              .FILL main_menu_show_menu
                             .FILL main_menu_init_filter
                             .FILL main_menu_init_next
                             .FILL #0
-main_menu_init_text         .STRINGZ "\n\n==CALCULADORA ARQUITECTURA 2026==\n[7] x      [8] /      [9] Log    [b] TRANSFORMACION BILINEAL\n[4] sqrt   [5] exp    [6] pow    [c] CORDIC\n[1] sin    [2] cos    [3] base   [d] Q3.12 -> Q7.8\n[0] MCD    [a] MCM               [e] (salir)\n"
-main_menu_init_filter       .STRINGZ "09aeAE"
-main_menu_init_next         .FILL main_menu_mcd
+main_menu_init_text         .STRINGZ "\n\n==CALCULADORA ARQUITECTURA 2026==\n[7] x      [8] /      [9] Log    [a] MCD\n[4] sqrt   [5] exp    [6] pow    [b] MCM\n[1] sin    [2] cos    [3] base   [c] Q3.12 -> Q7.8\n[0] Reduccion de argumento       [d] (salir)\n"
+main_menu_init_filter       .STRINGZ "09adAD"
+main_menu_init_next         .FILL main_menu_argrd
                             .FILL main_menu_sin
                             .FILL main_menu_cos
                             .FILL main_menu_base
@@ -574,9 +574,8 @@ main_menu_init_next         .FILL main_menu_mcd
                             .FILL main_menu_mult
                             .FILL main_menu_div
                             .FILL main_menu_log
+                            .FILL main_menu_mcd
                             .FILL main_menu_mcm
-                            .FILL main_menu_trbilin
-                            .FILL main_menu_cordic
                             .FILL main_menu_qtoq
                             .FILL main_menu_end
 
@@ -586,13 +585,13 @@ main_menu_end               .FILL main_menu_return
                             ; el controlador simplemente es continuar en return).
 
 ;   ============================================================================
-main_menu_mcd               .FILL main_menu_two_int
-                            .FILL main_menu_mcd_text
+main_menu_argrd             .FILL main_menu_one_q12
+                            .FILL main_menu_argrd_text
                             .FILL #0
-                            .FILL main_menu_mcd_next
-                            .FILL main_menu_sub_mcd
-main_menu_mcd_text          .STRINGZ "\n\n==MAXIMO COMUN DIVISOR==\n"
-main_menu_mcd_next          .FILL main_menu_init
+                            .FILL main_menu_argrd_next
+                            .FILL main_menu_sub_argrd
+main_menu_argrd_text        .STRINGZ "\n\n==REDUCCION DE ARGUMENTO (CORDIC)==\n"
+main_menu_argrd_next        .FILL main_menu_init
 
 ;   ============================================================================
 main_menu_sin               .FILL main_menu_show_menu
@@ -771,10 +770,11 @@ main_menu_div               .FILL main_menu_show_menu
                             .FILL main_menu_div_filter
                             .FILL main_menu_div_next
                             .FILL #0
-main_menu_div_text          .STRINGZ "\n\n==DIVISION==\n[0] LONG DIVISION\n[1] NEWTON-RAPHSON\n"
-main_menu_div_filter        .STRINGZ "01"
+main_menu_div_text          .STRINGZ "\n\n==DIVISION==\n[0] LONG DIVISION\n[1] NEWTON-RAPHSON\n[2] CORDIC\n"
+main_menu_div_filter        .STRINGZ "02"
 main_menu_div_next          .FILL main_menu_div_long
                             .FILL main_menu_div_nr
+                            .FILL main_menu_div_cordic
 ;   ----------------------------------------------------------------------------
 main_menu_div_long          .FILL main_menu_two_q8
                             .FILL main_menu_div_long_text
@@ -791,15 +791,50 @@ main_menu_div_nr            .FILL main_menu_two_q8
                             .FILL main_menu_sub_div_nr
 main_menu_div_nr_text       .STRINGZ "\n\n==DIVISION (NEWTON-RAPHSON)==\n"
 main_menu_div_nr_next       .FILL main_menu_init
+;   ----------------------------------------------------------------------------
+main_menu_div_cordic        .FILL main_menu_two_q15
+                            .FILL main_menu_div_cordic_text
+                            .FILL #0
+                            .FILL main_menu_div_cordic_next
+                            .FILL main_menu_sub_div_cordic
+main_menu_div_cordic_text   .STRINGZ "\n\n==DIVISION (CORDIC)==\n"
+main_menu_div_cordic_next   .FILL main_menu_init
 
 ;   ============================================================================
-main_menu_log               .FILL main_menu_one_q8
+main_menu_log               .FILL main_menu_show_menu
                             .FILL main_menu_log_text
-                            .FILL #0
+                            .FILL main_menu_log_filter
                             .FILL main_menu_log_next
-                            .FILL main_menu_sub_log
-main_menu_log_text          .STRINGZ "\n\n==LOGARITMO==\n"
-main_menu_log_next          .FILL main_menu_init
+                            .FILL #0
+main_menu_log_text          .STRINGZ "\n\n==LOGARITMO==\n[0] BORCHARDT\n[1] CORDIC\n"
+main_menu_log_filter        .STRINGZ "01"
+main_menu_log_next          .FILL main_menu_log_borch
+                            .FILL main_menu_log_cordic
+;   ----------------------------------------------------------------------------
+main_menu_log_borch         .FILL main_menu_one_q8
+                            .FILL main_menu_log_borch_text
+                            .FILL #0
+                            .FILL main_menu_log_borch_next
+                            .FILL main_menu_sub_log_borch
+main_menu_log_borch_text    .STRINGZ "\n\n==LOGARITMO== (BORCHARDT)\n"
+main_menu_log_borch_next    .FILL main_menu_init
+;   ----------------------------------------------------------------------------
+main_menu_log_cordic        .FILL main_menu_one_q12
+                            .FILL main_menu_log_cordic_text
+                            .FILL #0
+                            .FILL main_menu_log_cordic_next
+                            .FILL main_menu_sub_log_cordic
+main_menu_log_cordic_text   .STRINGZ "\n\n==LOGARITMO== (CORDIC)\n"
+main_menu_log_cordic_next   .FILL main_menu_init
+
+;   ============================================================================
+main_menu_mcd               .FILL main_menu_two_int
+                            .FILL main_menu_mcd_text
+                            .FILL #0
+                            .FILL main_menu_mcd_next
+                            .FILL main_menu_sub_mcd
+main_menu_mcd_text          .STRINGZ "\n\n==MAXIMO COMUN DIVISOR==\n"
+main_menu_mcd_next          .FILL main_menu_init
 
 ;   ============================================================================
 main_menu_mcm               .FILL main_menu_two_int
@@ -809,42 +844,6 @@ main_menu_mcm               .FILL main_menu_two_int
                             .FILL main_menu_sub_mcm
 main_menu_mcm_text          .STRINGZ "\n\n==MINIMO COMUN MULTIPLO==\n"
 main_menu_mcm_next          .FILL main_menu_init
-
-;   ============================================================================
-main_menu_trbilin           .FILL main_menu_two_q15
-                            .FILL main_menu_trbilin_text
-                            .FILL #0
-                            .FILL main_menu_trbilin_next
-                            .FILL main_menu_sub_trbilin
-main_menu_trbilin_text      .STRINGZ "\n\n==TRANSFORMACION BILINEAL (DIVISION CORDIC)==\n"
-main_menu_trbilin_next      .FILL main_menu_init
-
-;   ============================================================================
-main_menu_cordic            .FILL main_menu_show_menu
-                            .FILL main_menu_cordic_text
-                            .FILL main_menu_cordic_filter
-                            .FILL main_menu_cordic_next
-                            .FILL #0
-main_menu_cordic_text       .STRINGZ "\n\n==CORDIC==\n[0] ARGUMENTO MANUAL\n[1] SERIE ARCTAN\n"
-main_menu_cordic_filter     .STRINGZ "01"
-main_menu_cordic_next       .FILL main_menu_cordic_man
-                            .FILL main_menu_cordic_atan
-;   ----------------------------------------------------------------------------
-main_menu_cordic_man        .FILL main_menu_one_q12
-                            .FILL main_menu_cordic_man_text
-                            .FILL #0
-                            .FILL main_menu_cordic_man_next
-                            .FILL main_menu_sub_cordic_man
-main_menu_cordic_man_text   .STRINGZ "\n\n==CORDIC (ARGUMENTO MANUAL)==\n"
-main_menu_cordic_man_next   .FILL main_menu_init
-;   ----------------------------------------------------------------------------
-main_menu_cordic_atan       .FILL main_menu_one_q12
-                            .FILL main_menu_cordic_atan_text
-                            .FILL #0
-                            .FILL main_menu_cordic_atan_next
-                            .FILL main_menu_sub_cordic_atan
-main_menu_cordic_atan_text  .STRINGZ "\n\n==CORDIC (SERIE ARCTANH) (CORDIC LN)==\n"
-main_menu_cordic_atan_next  .FILL main_menu_init
 
 ;   ============================================================================
 main_menu_qtoq              .FILL main_menu_one_q12_result_q8
@@ -860,30 +859,29 @@ main_menu_qtoq_next         .FILL main_menu_init
 ;   ============================================================================
 ;   ==- SUBRUTINAS de las Funciones de la calculadora -=========================
 
-main_menu_sub_mult_cordic   .FILL NULL_SUBRUTINE        ; <- MULT_CORDIC
-main_menu_sub_mult_basic    .FILL NULL_SUBRUTINE        ; <- MULT_BASIC
-main_menu_sub_mult_booth    .FILL NULL_SUBRUTINE        ; <- MULT_BOOTH
-main_menu_sub_div_long      .FILL NULL_SUBRUTINE        ; <- DIV_LONG
-main_menu_sub_div_nr        .FILL NULL_SUBRUTINE        ; <- DIV_NEWTONRAPHSON
-main_menu_sub_log           .FILL NULL_SUBRUTINE        ; <- LOG
-main_menu_sub_sqrt_nonres   .FILL NULL_SUBRUTINE        ; <- SQRT_NONRES
-main_menu_sub_sqrt_nr       .FILL NULL_SUBRUTINE        ; <- SQRT_NEWTONRAPHSON
-main_menu_sub_exp           .FILL NULL_SUBRUTINE        ; <- EXP
-main_menu_sub_pow_mults     .FILL NULL_SUBRUTINE        ; <- POW_MULTS
-main_menu_sub_pow_expbin    .FILL NULL_SUBRUTINE        ; <- POW_EXPBIN
-main_menu_sub_sin_taylor    .FILL NULL_SUBRUTINE        ; <- SIN_TAYLOR
-main_menu_sub_sin_table     .FILL NULL_SUBRUTINE        ; <- SIN_TABLE
-main_menu_sub_sin_cheb      .FILL NULL_SUBRUTINE        ; <- SIN_CHEB
-main_menu_sub_cos           .FILL NULL_SUBRUTINE        ; <- COS_TABLE
-main_menu_sub_base_dec      .FILL NULL_SUBRUTINE        ; <- BASE_DEC
-main_menu_sub_base_hex      .FILL NULL_SUBRUTINE        ; <- BASE_HEX
-main_menu_sub_base_bin      .FILL NULL_SUBRUTINE        ; <- BASE_BIN
-main_menu_sub_mcd           .FILL NULL_SUBRUTINE        ; <- MCD
-main_menu_sub_mcm           .FILL NULL_SUBRUTINE        ; <- MCM
-main_menu_sub_trbilin       .FILL NULL_SUBRUTINE        ; <- TR_BILINEAL
-main_menu_sub_cordic_man    .FILL NULL_SUBRUTINE        ; <- CORDIC_MANUAL
-main_menu_sub_cordic_atan   .FILL NULL_SUBRUTINE        ; <- CORDIC_ARCTAN
-main_menu_sub_qtoq          .FILL NULL_SUBRUTINE        ; <- Q_TO_Q                ; Q3.12 to Q7.8
+main_menu_sub_mult_cordic   .FILL NULL_SUBRUTINE
+main_menu_sub_mult_basic    .FILL NULL_SUBRUTINE
+main_menu_sub_mult_booth    .FILL NULL_SUBRUTINE
+main_menu_sub_div_long      .FILL NULL_SUBRUTINE
+main_menu_sub_div_nr        .FILL NULL_SUBRUTINE
+main_menu_sub_div_cordic    .FILL NULL_SUBRUTINE
+main_menu_sub_log_borch     .FILL NULL_SUBRUTINE
+main_menu_sub_log_cordic    .FILL NULL_SUBRUTINE
+main_menu_sub_sqrt_nonres   .FILL NULL_SUBRUTINE
+main_menu_sub_sqrt_nr       .FILL NULL_SUBRUTINE
+main_menu_sub_exp           .FILL NULL_SUBRUTINE
+main_menu_sub_pow_mults     .FILL NULL_SUBRUTINE
+main_menu_sub_pow_expbin    .FILL NULL_SUBRUTINE
+main_menu_sub_sin_taylor    .FILL NULL_SUBRUTINE
+main_menu_sub_sin_table     .FILL NULL_SUBRUTINE
+main_menu_sub_sin_cheb      .FILL NULL_SUBRUTINE
+main_menu_sub_cos           .FILL NULL_SUBRUTINE
+main_menu_sub_base_hex      .FILL NULL_SUBRUTINE
+main_menu_sub_base_bin      .FILL NULL_SUBRUTINE
+main_menu_sub_mcd           .FILL NULL_SUBRUTINE
+main_menu_sub_mcm           .FILL NULL_SUBRUTINE
+main_menu_sub_argrd         .FILL NULL_SUBRUTINE
+main_menu_sub_qtoq          .FILL NULL_SUBRUTINE
 
 
 ; (subrutina valida, pero que no hace nada...)
