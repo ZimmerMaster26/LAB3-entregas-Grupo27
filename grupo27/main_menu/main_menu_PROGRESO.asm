@@ -128,16 +128,16 @@ main_menu_show_menu_sk1
 
 ;   ==- Controlador subrutinas de un entero (no muestra resultado) -============
 main_menu_one_int_noresult
-    AND R0 R0 #0
+    LD R0 main_menu_0
     LD R1 main_menu_neg_1
     LD R2 main_menu_neg_1
     BR main_menu_call
 
 ;   ==- Controlador subrutinas de dos enteros  -================================
 main_menu_two_int
-    AND R0 R0 #0
-    AND R1 R1 #0
-    AND R2 R2 #0
+    LD R0 main_menu_0
+    LD R1 main_menu_0
+    LD R2 main_menu_0
     BR main_menu_call
 
 ;   ==- Controlador subrutinas de un Q3.12 -====================================
@@ -161,10 +161,24 @@ main_menu_one_q12_result_q14
     LD R2 main_menu_14
     BR main_menu_call
 
+;   ==- Controlador subrutinas de un Q8.7 -=====================================
+main_menu_one_q7
+    LD R0 main_menu_7
+    LD R1 main_menu_neg_1
+    LD R2 main_menu_7
+    BR main_menu_call
+
 ;   ==- Controlador subrutinas de un Q7.8 -=====================================
 main_menu_one_q8
     LD R0 main_menu_8
     LD R1 main_menu_neg_1
+    LD R2 main_menu_8
+    BR main_menu_call
+
+;   ==- Controlador subrutinas de un Q7.8 un int resultado en Q7.8 -============
+main_menu_q8_int_result_q8
+    LD R0 main_menu_8
+    LD R1 main_menu_0
     LD R2 main_menu_8
     BR main_menu_call
 
@@ -305,6 +319,7 @@ main_menu_prompt_qb_vec     .FILL main_menu_prompt_qb_text_vec
 main_menu_prompt_q_vec      .FILL main_menu_prompt_q_text_vec  
 main_menu_neg_1             .FILL #-1
 main_menu_0                 .FILL #0
+main_menu_7                 .FILL #7
 main_menu_8                 .FILL #8
 main_menu_9                 .FILL #9
 main_menu_12                .FILL #12
@@ -712,7 +727,7 @@ main_menu_pow_filter        .STRINGZ "01"
 main_menu_pow_next          .FILL main_menu_pow_mults
                             .FILL main_menu_pow_expbin
 ;   ----------------------------------------------------------------------------
-main_menu_pow_mults         .FILL main_menu_two_int
+main_menu_pow_mults         .FILL main_menu_q8_int_result_q8
                             .FILL main_menu_pow_mults_text
                             .FILL #0
                             .FILL main_menu_pow_mults_next
@@ -811,7 +826,7 @@ main_menu_log_filter        .STRINGZ "01"
 main_menu_log_next          .FILL main_menu_log_borch
                             .FILL main_menu_log_cordic
 ;   ----------------------------------------------------------------------------
-main_menu_log_borch         .FILL main_menu_one_q8
+main_menu_log_borch         .FILL main_menu_one_q7
                             .FILL main_menu_log_borch_text
                             .FILL #0
                             .FILL main_menu_log_borch_next
@@ -862,7 +877,7 @@ main_menu_qtoq_next         .FILL main_menu_init
 .EXTERNAL g1_cordic_division-CORDIC_DIV                         ; DIV CORDIC (Q15, Q15 -> Q15)
 .EXTERNAL g3_MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD   ; MULT SHIFT ADD (Q8, Q8 -> DQ16)
 .EXTERNAL g4_potencia-EXP_RAPIDA                                ; POW EXPBIN (int, int -> int)
-;.EXTERNAL g5_                                                   ; POW MULTS (?) ERROR: Esta la subrutina para MULT por sumas sucesivas, pero no POW por multiplicaiones sucesivas.
+.EXTERNAL g5_Mul_Sucesiva_POW-Mul_Sucesiva_POW                  ; POW MULTS (Q8, int -> Q8)
 .EXTERNAL g6_EXP-EXP_Q3_12                                      ; EXP (Q12 -> Q8)
 .EXTERNAL g7_mcm-MCM                                            ; MCM (int, int -> int)
 .EXTERNAL g7_mcd-MCD                                            ; MCD (int, int -> int)
@@ -871,7 +886,7 @@ main_menu_qtoq_next         .FILL main_menu_init
 .EXTERNAL g10_division_larga-DIV_LONG                           ; DIV LONG (Q8, Q8 -> Q8)
 .EXTERNAL g11_CORDICLog-CORDIC_LOG_BASE                         ; LOG CORDIC (Q12 -> Q12)
 .EXTERNAL g12_subrutina_grupo_12-DIV_NEWTON                     ; DIV NEWTONRAPHSON (Q8, Q8 -> Q8)
-.EXTERNAL g14_log_borchardt_q8_7-LN_GENERAL_Q8_7                ; LOG BORCHARDT (Q8 -> Q8)
+.EXTERNAL g14_log_borchardt_q8_7-LN_GENERAL_Q8_7                ; LOG BORCHARDT (Q7 -> Q7)
 .EXTERNAL g15_G15_Q312_Q78-G15_Q312_Q78                         ; Q3.12 to Q7.8 (Q12 -> Q8)
 .EXTERNAL g18_booth-MULT_BOOTH                                  ; MULT BOOTH (Q8, Q8 -> Q8)
 .EXTERNAL g19_cordic_multiplicacion-CORDIC_MUL                  ; MULT CORDIC (Q8, Q8 -> Q8)
@@ -896,7 +911,7 @@ main_menu_sub_log_cordic    .FILL g11_CORDICLog-CORDIC_LOG_BASE
 main_menu_sub_sqrt_nonres   .FILL g23_modulo_sqrt_nr-SQRT_NR
 main_menu_sub_sqrt_nr       .FILL g9_sqrt_nr_dq16-SQRT_NR_DQ16
 main_menu_sub_exp           .FILL g6_EXP-EXP_Q3_12
-main_menu_sub_pow_mults     .FILL NULL_SUBRUTINE        ; <- POW_MULTS
+main_menu_sub_pow_mults     .FILL g5_Mul_Sucesiva_POW-Mul_Sucesiva_POW
 main_menu_sub_pow_expbin    .FILL g4_potencia-EXP_RAPIDA
 main_menu_sub_sin_taylor    .FILL NULL_SUBRUTINE        ; <- SIN_TAYLOR
 main_menu_sub_sin_table     .FILL g22_Tabla_SIN_y_COS-SENO_TABLA

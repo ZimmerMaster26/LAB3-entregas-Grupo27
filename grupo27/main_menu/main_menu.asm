@@ -128,16 +128,16 @@ main_menu_show_menu_sk1
 
 ;   ==- Controlador subrutinas de un entero (no muestra resultado) -============
 main_menu_one_int_noresult
-    AND R0 R0 #0
+    LD R0 main_menu_0
     LD R1 main_menu_neg_1
     LD R2 main_menu_neg_1
     BR main_menu_call
 
 ;   ==- Controlador subrutinas de dos enteros  -================================
 main_menu_two_int
-    AND R0 R0 #0
-    AND R1 R1 #0
-    AND R2 R2 #0
+    LD R0 main_menu_0
+    LD R1 main_menu_0
+    LD R2 main_menu_0
     BR main_menu_call
 
 ;   ==- Controlador subrutinas de un Q3.12 -====================================
@@ -161,10 +161,24 @@ main_menu_one_q12_result_q14
     LD R2 main_menu_14
     BR main_menu_call
 
+;   ==- Controlador subrutinas de un Q8.7 -=====================================
+main_menu_one_q7
+    LD R0 main_menu_7
+    LD R1 main_menu_neg_1
+    LD R2 main_menu_7
+    BR main_menu_call
+
 ;   ==- Controlador subrutinas de un Q7.8 -=====================================
 main_menu_one_q8
     LD R0 main_menu_8
     LD R1 main_menu_neg_1
+    LD R2 main_menu_8
+    BR main_menu_call
+
+;   ==- Controlador subrutinas de un Q7.8 un int resultado en Q7.8 -============
+main_menu_q8_int_result_q8
+    LD R0 main_menu_8
+    LD R1 main_menu_0
     LD R2 main_menu_8
     BR main_menu_call
 
@@ -305,6 +319,7 @@ main_menu_prompt_qb_vec     .FILL main_menu_prompt_qb_text_vec
 main_menu_prompt_q_vec      .FILL main_menu_prompt_q_text_vec  
 main_menu_neg_1             .FILL #-1
 main_menu_0                 .FILL #0
+main_menu_7                 .FILL #7
 main_menu_8                 .FILL #8
 main_menu_9                 .FILL #9
 main_menu_12                .FILL #12
@@ -712,7 +727,7 @@ main_menu_pow_filter        .STRINGZ "01"
 main_menu_pow_next          .FILL main_menu_pow_mults
                             .FILL main_menu_pow_expbin
 ;   ----------------------------------------------------------------------------
-main_menu_pow_mults         .FILL main_menu_two_int
+main_menu_pow_mults         .FILL main_menu_q8_int_result_q8
                             .FILL main_menu_pow_mults_text
                             .FILL #0
                             .FILL main_menu_pow_mults_next
@@ -811,7 +826,7 @@ main_menu_log_filter        .STRINGZ "01"
 main_menu_log_next          .FILL main_menu_log_borch
                             .FILL main_menu_log_cordic
 ;   ----------------------------------------------------------------------------
-main_menu_log_borch         .FILL main_menu_one_q8
+main_menu_log_borch         .FILL main_menu_one_q7
                             .FILL main_menu_log_borch_text
                             .FILL #0
                             .FILL main_menu_log_borch_next
