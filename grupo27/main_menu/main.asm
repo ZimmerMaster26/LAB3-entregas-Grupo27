@@ -46,24 +46,25 @@ main
 programa_del_menu
     .FILL   #1      ;   modo verboso (muestra todos los valores por consola)
     
-    .FILL   #7      ;   MULTIPLICACION
-    .FILL   #2      ;   MULTIPLICACION BOOTH
-    .FILL   x0500   ;   (Q7.8) valor a (5)
-    .FILL   xF400   ;   (Q7.8) valor b (-12)
-    .FILL   #0      ;   (Q7.8) espacio para el resultado.
+    .FILL   #15     ;   MULTIPLICACION BOOTH        (Indice de operacion)
+    .FILL   x0500   ;   Valor 5                     (Q7.8)
+    .FILL   xF400   ;   Valor -12                   (Q7.8)
+    .FILL   #0      ;   Espacio para el resultado   (Q7.8)
+    .FILL   #0      ;   Espacio para el resultado   (Quedara en blanco)
     
-    .FILL   #4      ;   SQRT
-    .FILL   #1      ;   SQRT NEWTONRAPHSON
-    .FILL   x0002   ;   
-    .FILL   x0000   ;   (Q15.16 usa 2 WORD) valor a (2.0)
-    .FILL   #0      ;   
-    .FILL   #0      ;   (Q15.16 usa 2 WORD) espacio para resultado.
+    .FILL   #9      ;   SQRT NEWTONRAPHSON          (Indice de operacion)
+    .FILL   x0002   ;   Valor 2.0                   (Q15.16) 
+    .FILL   x0000   ;   *                           (DQ16 usa 2 WORD)
+    .FILL   #0      ;   Espacio para el resultado   (Q15.16)
+    .FILL   #0      ;   *                           (DQ16 usa 2 WORD)
 
-    .FILL   #2      ;   COS TABLE
-    .FILL   x1921   ;   (Q3.12) valor a (1.5708)
-    .FILL   #0      ;   (Q1.14) espacio para el resultado.
+    .FILL   #5      ;   COSENO TABLA                (Indice de operacion)
+    .FILL   x1921   ;   Valor 1.5708                (Q3.12)
+    .FILL   #0      ;   *                           (Usa un solo operando)
+    .FILL   #0      ;   Espacio para el resultado   (Q1.14)
+    .FILL   #0      ;   Espacio para el resultado   (Quedara en blanco)
 
-    .FILL   #13     ;   SALIR
+    .FILL   #0      ;   SALIR
 
 
 
