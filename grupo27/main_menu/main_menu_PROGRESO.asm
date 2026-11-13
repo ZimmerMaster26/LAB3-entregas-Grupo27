@@ -133,6 +133,13 @@ main_menu_one_int_noresult
     LD R2 main_menu_neg_1
     BR main_menu_call
 
+;   ==- Controlador subrutinas de un entero resultado en Q3.12 -================
+main_menu_one_int_result_q12
+    LD R0 main_menu_0
+    LD R1 main_menu_neg_1
+    LD R2 main_menu_12
+    BR main_menu_call
+
 ;   ==- Controlador subrutinas de dos enteros  -================================
 main_menu_two_int
     LD R0 main_menu_0
@@ -620,7 +627,7 @@ main_menu_sin_next          .FILL main_menu_sin_taylor
                             .FILL main_menu_sin_table
                             .FILL main_menu_sin_cheb
 ;   ----------------------------------------------------------------------------
-main_menu_sin_taylor        .FILL main_menu_one_q12
+main_menu_sin_taylor        .FILL main_menu_one_int_result_q12
                             .FILL main_menu_sin_taylor_text
                             .FILL #0
                             .FILL main_menu_sin_taylor_next
@@ -891,12 +898,12 @@ main_menu_qtoq_next         .FILL main_menu_init
 .EXTERNAL g18_booth-MULT_BOOTH                                  ; MULT BOOTH (Q8, Q8 -> Q8)
 .EXTERNAL g19_cordic_multiplicacion-CORDIC_MUL                  ; MULT CORDIC (Q8, Q8 -> Q8)
 .EXTERNAL g20_Cordic_reduccion_de_argumento-Reduccion_Argumento ; REDUCCION DE ARGUMENTO (CORDIC) (Q12 -> Q12)
-;.EXTERNAL g21_                                                  ; SIN TAYLOR (Q12 -> ? ) (?) ERROR: no hay subrutina? (esta el programa, pero no como subrutina)
+.EXTERNAL g21_senotaylor_subrutina-CALCULAR_SENO                ; SIN TAYLOR (int -> Q12)  (?) toman el angulo en: grados * 0.1 ?
 .EXTERNAL g22_Tabla_SIN_y_COS-SENO_TABLA                        ; SIN TABLE (Q12 -> Q14)
 .EXTERNAL g22_Tabla_SIN_y_COS-COSENO_TABLA                      ; COS TABLE (Q12 -> Q14)
 .EXTERNAL g23_modulo_sqrt_nr-SQRT_NR                            ; SQRT NONRES (Q8 -> Q9)
-;.EXTERNAL g24_                                                  ; BASE HEX (int -> noresult)
-;.EXTERNAL g24_                                                  ; BASE BIN (int -> noresult) (?) ERROR: no hay subrutinas? (esta el programa, pero no como subrutina)
+.EXTERNAL g24_conversor_lc3_max-SUB_BASE_HEX                    ; BASE HEX (int -> noresult)
+.EXTERNAL g24_conversor_lc3_max-SUB_BASE_BIN                    ; BASE BIN (int -> noresult)
 ; [GRUPO 27 MAIN MENU]                                          ;
 .EXTERNAL g30_seno_cheb_pade-SEN_CHEB_PADE                      ; SIN CHEBYSHEV-PADE (Q12 -> Q14)
 
@@ -913,12 +920,12 @@ main_menu_sub_sqrt_nr       .FILL g9_sqrt_nr_dq16-SQRT_NR_DQ16
 main_menu_sub_exp           .FILL g6_EXP-EXP_Q3_12
 main_menu_sub_pow_mults     .FILL g5_Mul_Sucesiva_POW-Mul_Sucesiva_POW
 main_menu_sub_pow_expbin    .FILL g4_potencia-EXP_RAPIDA
-main_menu_sub_sin_taylor    .FILL NULL_SUBRUTINE        ; <- SIN_TAYLOR
+main_menu_sub_sin_taylor    .FILL g21_senotaylor_subrutina-CALCULAR_SENO
 main_menu_sub_sin_table     .FILL g22_Tabla_SIN_y_COS-SENO_TABLA
 main_menu_sub_sin_cheb      .FILL g30_seno_cheb_pade-SEN_CHEB_PADE
 main_menu_sub_cos           .FILL g22_Tabla_SIN_y_COS-COSENO_TABLA
-main_menu_sub_base_hex      .FILL NULL_SUBRUTINE        ; <- BASE_HEX
-main_menu_sub_base_bin      .FILL NULL_SUBRUTINE        ; <- BASE_BIN
+main_menu_sub_base_hex      .FILL g24_conversor_lc3_max-SUB_BASE_HEX
+main_menu_sub_base_bin      .FILL g24_conversor_lc3_max-SUB_BASE_BIN
 main_menu_sub_mcd           .FILL g7_mcd-MCD
 main_menu_sub_mcm           .FILL g7_mcm-MCM
 main_menu_sub_argrd         .FILL g20_Cordic_reduccion_de_argumento-Reduccion_Argumento
