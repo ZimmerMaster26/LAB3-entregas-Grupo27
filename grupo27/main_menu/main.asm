@@ -125,11 +125,11 @@ programa_del_menu_completo
     .FILL   #0      ; parte entera del resultado (DQ15.16)
     .FILL   #0      ; parte fraccionaria del resultado (DQ15.16)
 
-;    .FILL   #10     ; EXPONENCIACION: e^(ln(2)) ~= 2
-;    .FILL   x0B17   ; ln(2) ~= 0.6931 (Q3.12)
-;    .FILL   #0      ; segundo operando no utilizado
-;    .FILL   #0      ; resultado (Q7.8)
-;    .FILL   #0      ; espacio sin uso
+    .FILL   #10     ; EXPONENCIACION: e^(ln(2)) ~= 2
+    .FILL   x0B17   ; ln(2) ~= 0.6931 (Q3.12)
+    .FILL   #0      ; segundo operando no utilizado
+    .FILL   #0      ; resultado (Q7.8)
+    .FILL   #0      ; espacio sin uso
 
     .FILL   #11     ; POTENCIA POR MULTIPLICACIONES: 2^3 = 8
     .FILL   x0200   ; base 2.0 (Q7.8)
