@@ -1,0 +1,109 @@
+; Sistema operativo ISA-G27 con consola MMIO compatible con LC-3.
+
+.ORIG x0000
+    .BLKW #32
+    .FILL GETC_HANDLER
+    .FILL OUT_HANDLER
+    .FILL PUTS_HANDLER
+    .FILL IN_HANDLER
+    .FILL PUTSW_HANDLER
+    .FILL #0
+    .BLKB #436
+
+GETC_HANDLER
+    ADD R6 R6 #-2
+    STR R1 R6 #0
+GETC_POLL
+    LD R1 KBSR_POINTER
+    LDR R1 R1 #0
+    BRzp GETC_POLL
+    LD R1 KBDR_POINTER
+    LDR R0 R1 #0
+    LDR R1 R6 #0
+    ADD R6 R6 #2
+    RTI
+
+OUT_HANDLER
+    ADD R6 R6 #-2
+    STR R1 R6 #0
+OUT_POLL
+    LD R1 DSR_POINTER
+    LDR R1 R1 #0
+    BRzp OUT_POLL
+    LD R1 DDR_POINTER
+    STR R0 R1 #0
+    LDR R1 R6 #0
+    ADD R6 R6 #2
+    RTI
+
+PUTS_HANDLER
+    ADD R6 R6 #-2
+    STR R0 R6 #0
+    ADD R6 R6 #-2
+    STR R1 R6 #0
+    ADD R6 R6 #-2
+    STR R2 R6 #0
+    ADD R6 R6 #-2
+    STR R7 R6 #0
+    ADD R2 R0 #0
+PUTS_LOOP
+    AND R1 R1 #0
+    LDRB R1 R2 #0
+    BRz PUTS_DONE
+    ADD R0 R1 #0
+    TRAP x21
+    ADD R2 R2 #1
+    BRnzp PUTS_LOOP
+PUTS_DONE
+    LDR R7 R6 #0
+    ADD R6 R6 #2
+    LDR R2 R6 #0
+    ADD R6 R6 #2
+    LDR R1 R6 #0
+    ADD R6 R6 #2
+    LDR R0 R6 #0
+    ADD R6 R6 #2
+    RTI
+
+IN_HANDLER
+    ADD R6 R6 #-2
+    STR R7 R6 #0
+    TRAP x20
+    TRAP x21
+    LDR R7 R6 #0
+    ADD R6 R6 #2
+    RTI
+
+PUTSW_HANDLER
+    ADD R6 R6 #-2
+    STR R0 R6 #0
+    ADD R6 R6 #-2
+    STR R1 R6 #0
+    ADD R6 R6 #-2
+    STR R2 R6 #0
+    ADD R6 R6 #-2
+    STR R7 R6 #0
+    ADD R2 R0 #0
+PUTSW_LOOP
+    LDR R1 R2 #0
+    BRz PUTSW_DONE
+    ADD R0 R1 #0
+    TRAP x21
+    ADD R2 R2 #2
+    BRnzp PUTSW_LOOP
+PUTSW_DONE
+    LDR R7 R6 #0
+    ADD R6 R6 #2
+    LDR R2 R6 #0
+    ADD R6 R6 #2
+    LDR R1 R6 #0
+    ADD R6 R6 #2
+    LDR R0 R6 #0
+    ADD R6 R6 #2
+    RTI
+
+KBSR_POINTER .FILL xFE00
+KBDR_POINTER .FILL xFE02
+DSR_POINTER  .FILL xFE04
+DDR_POINTER  .FILL xFE06
+.END
