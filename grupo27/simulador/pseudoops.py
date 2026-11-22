@@ -64,23 +64,41 @@ LISTADO DE DIRECTIVAS Y PSEUDO-OPERACIONES DE LA ISA-G27:
 REGLAS DE ALINEACIÓN Y PADDING EN MEMORIA:
 =============================================================================
 - La memoria de la ISA-G27 está direccionada por Byte (2^16 posiciones de 8 bits).
-- Las instrucciones ocupan exactamente 1 Word (2 Bytes) y deben estar alineadas.
-- En caso de haber un dato de 8 bits (.FILLB o similar) y a continuación un dato
-  de 1 Word (instrucción, .FILL, etc.), el ensamblador insertará un padding de
-  un Byte (8 bits en 0x00) para preservar la alineación de palabra.
-- En caso de haber 2 .FILLB (o datos de 8 bits) consecutivos, se ubican
-  directamente en memoria llenando exactamente 1 Word (16 bits) sin padding.
+- Las instrucciones ocupan exactamente 1 Word (2 Bytes) y comienzan en una
+  dirección par; el ensamblador agrega padding solo antes de una instrucción
+  cuando la dirección actual es impar.
+- Las pseudo-operaciones de datos se ubican consecutivamente, sin padding,
+  incluso cuando .FILL o .BLKW reservan Words.
 =============================================================================
 '''
 
 
 # Clase base para las pseudo-operaciones
 class BASE_PSEUDOOP:
+    """Interfaz para las pseudo-operaciones del ensamblador.
+
+    Cada ensamblador retorna KIND y DATA. Para MEMORY, DATA es una lista de
+    enteros entre 0 y 255. ORIG devuelve una dirección, EXTERNAL referencias
+    externas y END indica que no se procesen más líneas del módulo.
+    """
     MNEMONICS = []
     FORMATS = []
 
     def __init__(self, *args, **kwargs):
         pass
+
+    @staticmethod
+    def _memory_result(data):
+        if not isinstance(data, list) or any(
+            type(value) is not int or not 0 <= value <= 0xFF for value in data
+        ):
+            raise ValueError("DATA de memoria debe ser una lista de enteros entre 0 y 255")
+        return {"KIND": "MEMORY", "DATA": data}
+
+    @classmethod
+    def s_asemble_method(cls, format_idx, arguments):
+        """Retorna un descriptor KIND/DATA que consume el ensamblador."""
+        raise NotImplementedError(f"{cls.__name__} debe implementar s_asemble_method")
 
 
 # ---------------------------------------------------------------------------
@@ -92,17 +110,33 @@ class PseudoOp_ORIG(BASE_PSEUDOOP):
     MNEMONICS = [".ORIG"]
     FORMATS = [["MNEMONIC", "ADDRESS"]]
 
+    @classmethod
+    def s_asemble_method(cls, format_idx, arguments):
+        # Recibe como argumento la direccion de origen, y lo devuelve como 2 numeros de 8 bits
+        address = int(arguments[1]) & 0xFFFF
+        return {"KIND": "ORIG", "DATA": [(address >> 8) & 0xFF, address & 0xFF ]}
+
 
 class PseudoOp_END(BASE_PSEUDOOP):
     """Define el final del programa o módulo en el archivo actual."""
     MNEMONICS = [".END"]
     FORMATS = [["MNEMONIC"]]
 
+    @classmethod
+    def s_asemble_method(cls, format_idx, arguments):
+        return {"KIND": "END", "DATA": []}
+
 
 class PseudoOp_EXTERNAL(BASE_PSEUDOOP):
     """Declara una etiqueta perteneciente a otro archivo o módulo externo."""
     MNEMONICS = [".EXTERNAL"]
     FORMATS = [["MNEMONIC", "EXT_SYMBOL"]]
+
+    @classmethod
+    def s_asemble_method(cls, format_idx, arguments):
+        # Recibe como argumento la direccion del symbolo externo, y lo devuelve como 2 numeros de 8 bits
+        address = int(arguments[1]) & 0xFFFF
+        return {"KIND": "EXTERNAL", "DATA": [(address >> 8) & 0xFF, address & 0xFF ]}
 
 
 # ---------------------------------------------------------------------------
@@ -112,13 +146,23 @@ class PseudoOp_EXTERNAL(BASE_PSEUDOOP):
 class PseudoOp_FILL(BASE_PSEUDOOP):
     """Define e inicializa 1 Word (16 bits / 2 Bytes) en memoria."""
     MNEMONICS = [".FILL"]
-    FORMATS = [["MNEMONIC", "VALUE"]]
+    FORMATS = [["MNEMONIC", "VALUE_16"]]
+
+    @classmethod
+    def s_asemble_method(cls, format_idx, arguments):
+        data = int(arguments[1]) & 0xFFFF
+        return cls._memory_result([data >> 8, data & 0xFF])
 
 
 class PseudoOp_FILLB(BASE_PSEUDOOP):
     """Define e inicializa 1 Byte (8 bits) en memoria."""
     MNEMONICS = [".FILLB"]
-    FORMATS = [["MNEMONIC", "VALUE"]]
+    FORMATS = [["MNEMONIC", "VALUE_8"]]
+
+    @classmethod
+    def s_asemble_method(cls, format_idx, arguments):
+        data = int(arguments[1])
+        return cls._memory_result([data & 0xFF])
 
 
 class PseudoOp_BLKW(BASE_PSEUDOOP):
@@ -126,17 +170,38 @@ class PseudoOp_BLKW(BASE_PSEUDOOP):
     MNEMONICS = [".BLKW"]
     FORMATS = [["MNEMONIC", "COUNT"]]
 
+    @classmethod
+    def s_asemble_method(cls, format_idx, arguments):
+        count = int(arguments[1])
+        if count < 0:
+            raise ValueError(".BLKW requiere una cantidad no negativa")
+        return cls._memory_result([0] * (2 * count))
+
 
 class PseudoOp_BLKB(BASE_PSEUDOOP):
     """Reserva un bloque de Bytes en blanco (1 Byte por posición)."""
     MNEMONICS = [".BLKB"]
     FORMATS = [["MNEMONIC", "COUNT"]]
 
+    @classmethod
+    def s_asemble_method(cls, format_idx, arguments):
+        count = int(arguments[1])
+        if count < 0:
+            raise ValueError(".BLKB requiere una cantidad no negativa")
+        return cls._memory_result([0] * count)
+
 
 class PseudoOp_STRINGZ(BASE_PSEUDOOP):
     """Define una cadena de caracteres ASCII de 8 bits terminada en nulo ('\\0')."""
     MNEMONICS = [".STRINGZ"]
     FORMATS = [["MNEMONIC", "STRING"]]
+
+    @classmethod
+    def s_asemble_method(cls, format_idx, arguments):
+        text = str(arguments[1])
+        data = list(text.encode("ascii", errors="replace"))
+        data.append(0)
+        return cls._memory_result(data)
 
 
 # Lista de todas las pseudo-operaciones disponibles
