@@ -15,7 +15,7 @@
 ### Miércoles 18, Nov 2026
 
 - Planteamiento de todas las instrucciones a implementar en la ISA.
-  -  Tabla con OP Codes, argumentos, modo de direccionamiento, descripciones, entre otros.
+  -  Tabla con OP-Codes, argumentos, modo de direccionamiento, descripciones, entre otros.
 - (Exposición explicación del programa del menú utilizado en el benchmark).
 - Discusión de detalles de programación.
   - Agentes, editor de código preferente, entre otros.
@@ -24,3 +24,15 @@
 
 - Definición de especificaciones para relazarse la generación de código.  
 (Servirá como parte del prompt para el/los agentes que generen el código)
+
+
+### Domingo 22, Nov 2026
+
+- Cambio del método de generación de código a un acercamiento asistido (se define el archivo, la estructura general y ejemplos de como se quiere el código, y se deja la compleción y funcionamiento correcto al agente)
+- Se completó el código de instrucciones, predictores, pseudo-operaciones.
+- Se completó el código del ensamblador. 
+
+
+### Lunes 23, Nov 2026
+
+- Testeo del ensamblador.

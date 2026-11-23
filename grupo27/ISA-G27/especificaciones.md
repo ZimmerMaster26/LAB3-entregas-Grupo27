@@ -63,8 +63,7 @@ Se dispondrán de las siguientes pseudo operaciones:
 - `.BLKW` define un numero de Words en blanco.
 - `.BLKB` define un numero de Bytes en blanco.
 - `.STRINGZ` define una cadena de caracteres de 8 bits seguidos por un espacio en blanco (que actúa como carácter '\0').
-En caso de haber 1 `.FILLB` (o un dato de 8 bits) y a continuación un dato de 1 Word (instrucción, dato de 16 bits, etc.), se llenara con un padding de un Byte (8 bits en 0).
-En caso de haber 2 `.FILLB` (o datos de 8 bits) consecutivos actuaria correctamente llenando únicamente 16 bits de memoria.
+En caso de haber una instrucción que quedará desalineada después de datos, se rellenara con 8 bits en 0, para que las instrucciones que son de 16 bits, siempre estén en direcciones de memoria pares.
 
 Para la pseudo operación `.EXTERNAL`:
 - Se espera que la sintaxis sea `.EXTERNAL nombre_de_archivo-etiqueta`
