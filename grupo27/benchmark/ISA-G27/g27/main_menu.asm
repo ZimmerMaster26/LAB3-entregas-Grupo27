@@ -15,8 +15,8 @@
 .EXTERNAL GETVAL-GETVAL
 .EXTERNAL OUTVAL-OUTVAL
 
-.EXTERNAL cordic_division-CORDIC_DIV
-.EXTERNAL MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD
+.EXTERNAL cordic_division-CORDIC_DIV_Q15
+.EXTERNAL MultiplicacionSHIFTandADD-MUL_Q7_8_SHIFT_ADD
 .EXTERNAL potencia-EXP_RAPIDA
 .EXTERNAL Mul_Sucesiva_POW-Mul_Sucesiva_POW
 .EXTERNAL EXP-EXP_Q3_12
@@ -26,7 +26,7 @@
 .EXTERNAL division_larga-DIV_LONG
 .EXTERNAL CORDICLog-CORDIC_LOG_BASE
 .EXTERNAL subrutina_grupo_12-DIV_NEWTON
-.EXTERNAL log_borchardt_q8_7-LN_GENERAL_Q8_7
+.EXTERNAL log_borchardt_q8_7-LN_Q8_7
 .EXTERNAL G15_Q312_Q78-G15_Q312_Q78
 .EXTERNAL booth-MULT_BOOTH
 .EXTERNAL cordic_multiplicacion-CORDIC_MUL
@@ -349,12 +349,12 @@ sub_getval:                 .FILL GETVAL-GETVAL
 sub_outval:                 .FILL OUTVAL-OUTVAL
 
 sub_mult_cordic:            .FILL cordic_multiplicacion-CORDIC_MUL
-sub_mult_basic:             .FILL MultiplicacionSHIFTandADD-MULTIPLICARSHIFTANDADD
+sub_mult_basic:             .FILL MultiplicacionSHIFTandADD-MUL_Q7_8_SHIFT_ADD
 sub_mult_booth:             .FILL booth-MULT_BOOTH
 sub_div_long:               .FILL division_larga-DIV_LONG
 sub_div_nr:                 .FILL subrutina_grupo_12-DIV_NEWTON
-sub_div_cordic:             .FILL cordic_division-CORDIC_DIV
-sub_log_borch:              .FILL log_borchardt_q8_7-LN_GENERAL_Q8_7
+sub_div_cordic:             .FILL cordic_division-CORDIC_DIV_Q15
+sub_log_borch:              .FILL log_borchardt_q8_7-LN_Q8_7
 sub_log_cordic:             .FILL CORDICLog-CORDIC_LOG_BASE
 sub_sqrt_nonres:            .FILL modulo_sqrt_nr-SQRT_NR
 sub_sqrt_nr:                .FILL sqrt_nr_dq16-SQRT_NR_DQ16

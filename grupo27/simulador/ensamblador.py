@@ -428,16 +428,22 @@ class ParsedLine:
 
 class ModuleAST:
     """Representa el conjunto de líneas analizadas y símbolos de un módulo/archivo."""
-    def __init__(self, name: str, lines=None, file_path=None):
+    def __init__(self, name: str, lines=None, file_path=None, source_label=None):
         self.name = name
         self.lines = lines or []
         self.file_path = file_path
+        self.source_label = source_label or file_path or name
         self.symbols = {}
         self.symbol_names = {}
         self.external_imports = {}
         self.start_address = 0
         self.end_address = 0
         self.external_dependencies = []
+        self.external_dependency_lines = {}
+
+
+class AssemblyError(ValueError):
+    """Error de ensamblado enriquecido con la ubicación de su línea fuente."""
 
 
 # ---------------------------------------------------------------------------
@@ -521,6 +527,7 @@ class Assembler:
 
         input_file_path = None
         source_is_file = False
+        main_source_label = None
 
         # Determinar el tipo de origen (archivo, diccionario o texto directo)
         if isinstance(source, dict):
@@ -536,10 +543,12 @@ class Assembler:
             if matched_key is not None:
                 main_code = f_map[matched_key]
                 main_name = self._normalize_mod_name(matched_key)
+                main_source_label = str(matched_key)
             elif main_file == "main":
                 first_key, first_val = next(iter(f_map.items()))
                 main_code = first_val
                 main_name = self._normalize_mod_name(first_key)
+                main_source_label = str(first_key)
             else:
                 raise FileNotFoundError(
                     f"No se pudo encontrar el archivo principal '{main_file}' en el diccionario"
@@ -550,6 +559,7 @@ class Assembler:
             source_is_file = True
             base_dir = str(input_file_path.parent)
             main_name = input_file_path.stem
+            main_source_label = str(input_file_path)
             with open(input_file_path, 'r', encoding='utf-8', errors='replace') as f:
                 main_code = f.read()
             f_map = dict(file_map or {})
@@ -562,6 +572,7 @@ class Assembler:
                 source_is_file = True
                 base_dir = str(input_file_path.parent)
                 main_name = input_file_path.stem
+                main_source_label = str(input_file_path)
                 with open(input_file_path, 'r', encoding='utf-8', errors='replace') as f:
                     main_code = f.read()
                 f_map = dict(file_map or {})
@@ -571,6 +582,7 @@ class Assembler:
             # Cadena de texto directa
             main_code = str(source)
             main_name = "main"
+            main_source_label = "<texto>"
             base_dir = os.getcwd()
             f_map = dict(file_map or {})
 
@@ -586,6 +598,7 @@ class Assembler:
             main_code=main_code,
             main_name=main_name,
             main_file_path=str(input_file_path) if input_file_path else None,
+            main_source_label=main_source_label,
             file_map=f_map,
             search_dirs=effective_search_dirs
         )
@@ -669,6 +682,28 @@ class Assembler:
             or upper in _known_pseudoop_mnemonics()
         )
 
+    def _run_at_source(self, source_label, line_num, operation, *args, **kwargs):
+        """Ejecuta una operación de una línea y adjunta su origen si falla."""
+        try:
+            return operation(*args, **kwargs)
+        except Exception as error:
+            if getattr(error, "_assembler_source_context", False):
+                raise
+            message = f"{source_label}:{line_num}: {error}"
+            try:
+                contextual_error = type(error)(message)
+            except (TypeError, ValueError):
+                contextual_error = AssemblyError(message)
+            try:
+                contextual_error._assembler_source_context = True
+            except AttributeError:
+                pass
+            raise contextual_error from error
+
+    @staticmethod
+    def _source_error(source_label, line_num, message):
+        return AssemblyError(f"{source_label}:{line_num}: {message}")
+
     def _is_external_pseudoop(self, pline: ParsedLine) -> bool:
         if not pline.is_pseudoop or not pline.mnemonic:
             return False
@@ -681,12 +716,12 @@ class Assembler:
             for field in fmt
         )
 
-    def _split_external_ref(self, ref: str, line_num: int) -> tuple:
+    def _split_external_ref(self, ref: str) -> tuple:
         """Separa una referencia externa 'archivo-etiqueta' validando ambas partes."""
         text = str(ref).strip()
         if '-' not in text:
             raise ValueError(
-                f"Referencia .EXTERNAL inválida '{ref}' (línea {line_num}): "
+                f"Referencia .EXTERNAL inválida '{ref}': "
                 "se esperaba el formato 'nombre_de_archivo-etiqueta'"
             )
         dep_file, dep_label = text.split('-', 1)
@@ -694,7 +729,7 @@ class Assembler:
         dep_label = dep_label.strip()
         if not dep_file or not dep_label:
             raise ValueError(
-                f"Referencia .EXTERNAL inválida '{ref}' (línea {line_num}): "
+                f"Referencia .EXTERNAL inválida '{ref}': "
                 "se esperaba el formato 'nombre_de_archivo-etiqueta'"
             )
         return dep_file, dep_label
@@ -880,63 +915,82 @@ class Assembler:
             for value in data
         ):
             raise ValueError(
-                f"DATA inválido en '{pline.mnemonic}' (línea {pline.line_num}): "
+                f"DATA inválido en '{pline.mnemonic}': "
                 "se esperaba una lista de enteros entre 0 y 255"
             )
         if result["KIND"] == "ORIG" and len(data) != 2:
             raise ValueError(
-                f"DATA inválido en '{pline.mnemonic}' (línea {pline.line_num}): "
-                "ORIG debe devolver dos bytes"
+                f"DATA inválido en '{pline.mnemonic}': ORIG debe devolver dos bytes"
             )
         return result
 
     def _load_all_modules(self, main_code: str, main_name: str, main_file_path: str,
-                          file_map: dict, search_dirs: list) -> list:
+                          main_source_label: str, file_map: dict,
+                          search_dirs: list) -> list:
         """Carga y analiza el módulo principal y resuelve todas sus dependencias .EXTERNAL."""
         loaded_modules = {}
         queued_norms = {self._normalize_mod_name(main_name)}
-        queue = [(main_name, main_code, main_file_path)]
+        queue = [(main_name, main_code, main_file_path, main_source_label)]
         modules_ast = []
 
         while queue:
-            mod_name, code, f_path = queue.pop(0)
+            mod_name, code, f_path, source_label = queue.pop(0)
             norm_name = self._normalize_mod_name(mod_name)
             if norm_name in loaded_modules:
                 continue
 
             parsed_lines = []
             external_deps = []
+            external_dependency_lines = {}
             external_imports = {}
 
             for line_idx, raw_line in enumerate(code.splitlines(), start=1):
-                pline = self._tokenize_line(line_idx, raw_line)
+                pline = self._run_at_source(
+                    source_label, line_idx, self._tokenize_line, line_idx, raw_line
+                )
                 parsed_lines.append(pline)
 
                 if pline.is_pseudoop:
                     if self._is_external_pseudoop(pline):
                         if not pline.operands:
-                            raise ValueError(
+                            raise self._source_error(
+                                source_label, pline.line_num,
                                 f"La directiva '{pline.mnemonic}' requiere al menos una referencia "
-                                f"(línea {pline.line_num})"
                             )
                         for op in pline.operands:
-                            dep_file, dep_label = self._split_external_ref(op, pline.line_num)
+                            dep_file, dep_label = self._run_at_source(
+                                source_label,
+                                pline.line_num,
+                                self._split_external_ref,
+                                op,
+                            )
                             norm_dep = self._normalize_mod_name(dep_file)
                             external_imports[(norm_dep, dep_label.lower())] = f"{dep_file}-{dep_label}"
                             if norm_dep not in {self._normalize_mod_name(d) for d in external_deps}:
                                 external_deps.append(dep_file)
+                                external_dependency_lines[norm_dep] = pline.line_num
                         continue
 
-                    result = self._assemble_pseudoop(
-                        pline, allow_unresolved=True
+                    result = self._run_at_source(
+                        source_label,
+                        pline.line_num,
+                        self._assemble_pseudoop,
+                        pline,
+                        allow_unresolved=True,
                     )
                     pline.pseudoop_result = result
                     kind = result["KIND"]
                     if kind == "END":
                         break
 
-            mod_ast = ModuleAST(name=mod_name, lines=parsed_lines, file_path=f_path)
+            mod_ast = ModuleAST(
+                name=mod_name,
+                lines=parsed_lines,
+                file_path=f_path,
+                source_label=source_label,
+            )
             mod_ast.external_dependencies = external_deps
+            mod_ast.external_dependency_lines = external_dependency_lines
             mod_ast.external_imports = external_imports
             loaded_modules[norm_name] = mod_ast
             modules_ast.append(mod_ast)
@@ -945,9 +999,17 @@ class Assembler:
             for dep in external_deps:
                 norm_dep = self._normalize_mod_name(dep)
                 if norm_dep not in loaded_modules and norm_dep not in queued_norms:
-                    dep_code, dep_path = self._resolve_external_file(dep, file_map, search_dirs)
+                    line_num = external_dependency_lines[norm_dep]
+                    dep_code, dep_path, dep_source_label = self._run_at_source(
+                        source_label,
+                        line_num,
+                        self._resolve_external_file,
+                        dep,
+                        file_map,
+                        search_dirs,
+                    )
                     queued_norms.add(norm_dep)
-                    queue.append((dep, dep_code, dep_path))
+                    queue.append((dep, dep_code, dep_path, dep_source_label))
 
         return modules_ast
 
@@ -965,7 +1027,7 @@ class Assembler:
         # 1. Buscar en file_map (insensible a mayúsculas/minúsculas y extensión .asm)
         for k, v in file_map.items():
             if self._normalize_mod_name(k) == norm:
-                return v, None
+                return v, None, str(k)
 
         # 2. Buscar en directorios de disco (insensible a mayúsculas/minúsculas)
         target_lower = f"{norm}.asm"
@@ -978,7 +1040,7 @@ class Assembler:
                     full_path = os.path.join(root, files_lower[target_lower])
                     try:
                         with open(full_path, 'r', encoding='utf-8', errors='replace') as f:
-                            return f.read(), full_path
+                            return f.read(), full_path, full_path
                     except OSError as e:
                         raise OSError(f"Error al leer el archivo externo '{full_path}': {e}")
 
@@ -1024,8 +1086,12 @@ class Assembler:
                 else:
                     result = pline.pseudoop_result
                     if result is None:
-                        result = self._assemble_pseudoop(
-                            pline, allow_unresolved=True
+                        result = self._run_at_source(
+                            mod.source_label,
+                            pline.line_num,
+                            self._assemble_pseudoop,
+                            pline,
+                            allow_unresolved=True,
                         )
                         pline.pseudoop_result = result
                     kind = result["KIND"]
@@ -1045,17 +1111,19 @@ class Assembler:
                             pending_labels.clear()
                         continue
                     if kind != "MEMORY":
-                        raise ValueError(
-                            f"Tipo de pseudo-operación no soportado: '{kind}' "
-                            f"en la línea {pline.line_num}"
+                        raise self._source_error(
+                            mod.source_label,
+                            pline.line_num,
+                            f"Tipo de pseudo-operación no soportado: '{kind}'",
                         )
 
                     try:
                         data_size = len(bytearray(result["DATA"]))
                     except (TypeError, ValueError) as error:
-                        raise ValueError(
-                            f"DATA inválido en '{pline.mnemonic}' "
-                            f"(línea {pline.line_num}): {error}"
+                        raise self._source_error(
+                            mod.source_label,
+                            pline.line_num,
+                            f"DATA inválido en '{pline.mnemonic}': {error}",
                         ) from error
                     pline.pad_bytes = 0
 
@@ -1083,34 +1151,48 @@ class Assembler:
                 if not self._is_external_pseudoop(pline):
                     continue
                 if not pline.operands:
-                    raise ValueError(
-                        f"La directiva '{pline.mnemonic}' requiere al menos una referencia "
-                        f"(línea {pline.line_num})"
+                    raise self._source_error(
+                        mod.source_label,
+                        pline.line_num,
+                        f"La directiva '{pline.mnemonic}' requiere al menos una referencia",
                     )
 
                 for reference in pline.operands:
-                    dep_file, dep_label = self._split_external_ref(reference, pline.line_num)
+                    dep_file, dep_label = self._run_at_source(
+                        mod.source_label,
+                        pline.line_num,
+                        self._split_external_ref,
+                        reference,
+                    )
                     norm_dep = self._normalize_mod_name(dep_file)
                     target_mod = modules_by_norm.get(norm_dep)
                     if target_mod is None:
-                        raise KeyError(
-                            f"Módulo externo '{dep_file}' no cargado para '{reference}' "
-                            f"(línea {pline.line_num})"
+                        raise self._source_error(
+                            mod.source_label,
+                            pline.line_num,
+                            f"Módulo externo '{dep_file}' no cargado para '{reference}'",
                         )
                     lbl_key = dep_label.lower()
                     if lbl_key not in target_mod.symbols:
-                        raise KeyError(
+                        raise self._source_error(
+                            mod.source_label,
+                            pline.line_num,
                             f"Etiqueta externa '{dep_label}' no encontrada en módulo '{dep_file}' "
-                            f"(referenciada desde '{mod.name}', línea {pline.line_num})"
+                            f"(referenciada desde '{mod.name}')",
                         )
                     address = target_mod.symbols[lbl_key]
-                    result = self._assemble_pseudoop(
-                        pline, operands=[address]
+                    result = self._run_at_source(
+                        mod.source_label,
+                        pline.line_num,
+                        self._assemble_pseudoop,
+                        pline,
+                        operands=[address],
                     )
                     if result["KIND"] != "EXTERNAL":
-                        raise ValueError(
-                            f"'{pline.mnemonic}' retornó KIND='{result['KIND']}' "
-                            f"en la línea {pline.line_num}"
+                        raise self._source_error(
+                            mod.source_label,
+                            pline.line_num,
+                            f"'{pline.mnemonic}' retornó KIND='{result['KIND']}'",
                         )
                     pline.pseudoop_result = result
 
@@ -1119,9 +1201,10 @@ class Assembler:
         """Registra un símbolo en el ámbito aislado del módulo (insensible a mayúsculas)."""
         key = label.lower()
         if key in mod.symbols:
-            loc = f" (línea {line_num})" if line_num is not None else ""
-            raise ValueError(
-                f"Etiqueta duplicada '{label}' en módulo '{mod.name}'{loc}"
+            raise self._source_error(
+                mod.source_label,
+                line_num or 1,
+                f"Etiqueta duplicada '{label}' en módulo '{mod.name}'",
             )
         mod.symbols[key] = address
         mod.symbol_names[key] = label
@@ -1146,8 +1229,12 @@ class Assembler:
                 if pline.is_pseudoop:
                     pseudo_result = pline.pseudoop_result
                     if pseudo_result is None or pseudo_result["KIND"] == "MEMORY":
-                        pseudo_result = self._assemble_pseudoop(
-                            pline, resolver=resolver
+                        pseudo_result = self._run_at_source(
+                            mod.source_label,
+                            pline.line_num,
+                            self._assemble_pseudoop,
+                            pline,
+                            resolver=resolver,
                         )
                     kind = pseudo_result["KIND"]
                     if kind == "END":
@@ -1155,9 +1242,10 @@ class Assembler:
                     if kind in ("ORIG", "EXTERNAL"):
                         continue
                     if kind != "MEMORY":
-                        raise ValueError(
-                            f"Tipo de pseudo-operación no soportado: '{kind}' "
-                            f"en la línea {pline.line_num}"
+                        raise self._source_error(
+                            mod.source_label,
+                            pline.line_num,
+                            f"Tipo de pseudo-operación no soportado: '{kind}'",
                         )
 
                 # 1. Emitir padding de byte si fue requerido para alinear
@@ -1168,11 +1256,28 @@ class Assembler:
                 if pline.is_instruction:
                     inst_cls = _instruction_class_for(pline.mnemonic)
                     if inst_cls is None:
-                        raise ValueError(f"Instrucción no registrada: '{pline.mnemonic}'")
-                    format_idx, args = self._match_instruction_format(
-                        inst_cls, pline.mnemonic, pline.operands, pline.address, resolver
+                        raise self._source_error(
+                            mod.source_label,
+                            pline.line_num,
+                            f"Instrucción no registrada: '{pline.mnemonic}'",
+                        )
+                    format_idx, args = self._run_at_source(
+                        mod.source_label,
+                        pline.line_num,
+                        self._match_instruction_format,
+                        inst_cls,
+                        pline.mnemonic,
+                        pline.operands,
+                        pline.address,
+                        resolver,
                     )
-                    inst_obj = inst_cls.s_asemble_method(format_idx, args)
+                    inst_obj = self._run_at_source(
+                        mod.source_label,
+                        pline.line_num,
+                        inst_cls.s_asemble_method,
+                        format_idx,
+                        args,
+                    )
 
                     val = int(inst_obj) & 0xFFFF
                     # Formato Little-Endian para palabras de 16 bits:
@@ -1184,9 +1289,10 @@ class Assembler:
                     try:
                         emitted_bytes.extend(bytearray(pseudo_result["DATA"]))
                     except (TypeError, ValueError) as error:
-                        raise ValueError(
-                            f"DATA inválido en '{pline.mnemonic}' "
-                            f"(línea {pline.line_num}): {error}"
+                        raise self._source_error(
+                            mod.source_label,
+                            pline.line_num,
+                            f"DATA inválido en '{pline.mnemonic}': {error}",
                         ) from error
 
         return emitted_bytes
