@@ -19,7 +19,8 @@ GETLINE:
 
 getline_loop:
         GETC                            ; R0 = carácter leído (8 bits)
-        ADD     R3, R0, #-10            ; ¿Carácter == '\n' (10)?
+        ADD     R3, R0, #-8
+        ADD     R3, R3, #-2             ; ¿Carácter == '\n' (10)?
         BRz     getline_ret
 
         OUT                             ; Mostrar carácter en consola

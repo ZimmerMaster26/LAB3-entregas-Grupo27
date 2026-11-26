@@ -8,11 +8,11 @@
 ;   - R0 = ptr (LD R0, ptr_*): modo automático desde bloque de ops.
 ; Conserva R6 y restaura registros según convención de MAIN_MENU.
 ;=====================================================================
-.EXTERNAL MAIN_MENU-MAIN_MENU
+.EXTERNAL g27_main_menu-MAIN_MENU
 
         BR      main
 
-sub_main_menu:          .FILL MAIN_MENU-MAIN_MENU
+sub_main_menu:          .FILL g27_main_menu-MAIN_MENU
 ptr_programa_menu:      .FILL programa_del_menu
 ptr_programa_completo:  .FILL programa_del_menu_completo
 

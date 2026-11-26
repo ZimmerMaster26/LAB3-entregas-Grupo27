@@ -43,11 +43,26 @@ NORM_OK:
         ADD     R2, R0, R4          ; R2 = y = m/2 - 0.5
         AND     R3, R3, #0          ; R3 = z = 0
 
-        ; Punteros a tablas (en ISA-G27 LDR suma Base + 2*offset)
-        LEA     R4, SEQ_NEG_I       ; Desplazamientos negativos (-i) para SHR (0 = fin)
-        LEA     R5, SEQ_WIDTH       ; Cantidad de bits válidos (16 - i) para SEXT
-        LEA     R0, LUT_ATANH
+        ; Cargar direcciones de tablas mediante punteros locales (PCoffset8 en palabras)
+        LD      R4, ptr_seq_neg_i
+        LD      R5, ptr_seq_width
+        LD      R0, ptr_lut_atanh
         ST      R0, var_ptr_atanh
+        BR      ITER
+
+; --- Punteros locales y respaldos cercanos a la entrada ---
+ptr_seq_neg_i:  .FILL SEQ_NEG_I
+ptr_seq_width:  .FILL SEQ_WIDTH
+ptr_lut_atanh:  .FILL LUT_ATANH
+guardado_r1:    .FILL #0
+guardado_r2:    .FILL #0
+guardado_r3:    .FILL #0
+guardado_r4:    .FILL #0
+guardado_r5:    .FILL #0
+guardado_r7:    .FILL #0
+NEG_HALF:       .FILL xF800         ; -0.5 en Q3.12
+HALF_Q12:       .FILL x0800         ; 0.5 en Q3.12
+var_k:          .FILL #0
 
         ; 4. Lazo principal CORDIC (i = 1, 2, 3, 4, 4, 5 .. 12)
 ITER:
@@ -105,6 +120,13 @@ NEXT:
         ADD     R5, R5, #2          ; Avanzar 1 palabra (2 bytes) en SEQ_WIDTH
         BR      ITER
 
+; --- Variables locales y constantes cercanas al lazo / salida ---
+var_width:      .FILL #0
+var_ys:         .FILL #0
+var_ptr_atanh:  .FILL #0
+LN2_Q12:        .FILL #2839         ; round(ln(2) * 4096)
+MIN_Q12:        .FILL x8000         ; -8.0 en Q3.12
+
         ; 5. Resultado final: ln(m) = 2*z - k*ln(2)
 FIN:
         ADD     R3, R3, R3          ; R3 = 2*z = ln(m * 2^k)
@@ -144,13 +166,8 @@ LOG_RET:
         RET
 
 ;=====================================================================
-; ZONA DE DATOS Y CONSTANTES
+; ZONA DE DATOS Y TABLAS CORDIC
 ;=====================================================================
-HALF_Q12:       .FILL x0800         ; 0.5 en Q3.12
-NEG_HALF:       .FILL xF800         ; -0.5 en Q3.12
-LN2_Q12:        .FILL #2839         ; round(ln(2) * 4096)
-MIN_Q12:        .FILL x8000         ; -8.0 en Q3.12
-
 ; Secuencia de desplazamientos negativos (-i) para SHR (negativo = derecha, 0 = fin)
 SEQ_NEG_I:      .FILL #-1
                 .FILL #-2
@@ -196,16 +213,5 @@ LUT_ATANH:      .FILL #2250
                 .FILL #4
                 .FILL #2
                 .FILL #1
-
-var_k:          .FILL #0
-var_ys:         .FILL #0
-var_width:      .FILL #0
-var_ptr_atanh:  .FILL #0
-guardado_r1:    .FILL #0
-guardado_r2:    .FILL #0
-guardado_r3:    .FILL #0
-guardado_r4:    .FILL #0
-guardado_r5:    .FILL #0
-guardado_r7:    .FILL #0
 
 .END

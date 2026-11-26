@@ -7,13 +7,13 @@
 ;   <- OUTPUT [R1] 0 (si n=0 o Qm.n), o parte fraccionaria Q0.16 (si n=16)
 ;   Conserva: R2-R7 (todos intactos, incluyendo R6).
 ;=====================================================================
-.EXTERNAL GETLINE-GETLINE
-.EXTERNAL FROMDEC-FROMDEC
-.EXTERNAL TODEC-TODEC
+.EXTERNAL g27_getline-GETLINE
+.EXTERNAL g27_fromdec-FROMDEC
+.EXTERNAL g27_todec-TODEC
 
-sub_getline:    .FILL GETLINE-GETLINE
-sub_fromdec:    .FILL FROMDEC-FROMDEC
-sub_todec:      .FILL TODEC-TODEC
+sub_getline:    .FILL g27_getline-GETLINE
+sub_fromdec:    .FILL g27_fromdec-FROMDEC
+sub_todec:      .FILL g27_todec-TODEC
 
 GETVAL:
         ST      R2, getval_r2
@@ -25,8 +25,8 @@ GETVAL:
         ST      R0, getval_n
 
         ; 1. Leer línea en el buffer interno (caracteres de 8 bits)
-        LEA     R0, getval_buf
-        LEA     R1, getval_buf_end
+        LD      R0, getval_buf_ads
+        LD      R1, getval_buf_end_ads
         LD      R2, sub_getline
         JSRR    R2                      ; R0 = puntero al buffer
 
@@ -91,9 +91,7 @@ getval_shl_int:
 
         ; Bits fraccionarios superiores: fraccion >> (16 - n)
         LD      R1, getval_tmp_frac
-        AND     R5, R5, #0
-        ADD     R5, R5, #8
-        ADD     R5, R5, #8              ; 16
+        LD      R5, getval_16           ; 16
         LD      R3, getval_n
         NOT     R3, R3
         ADD     R3, R3, #1
@@ -126,9 +124,7 @@ getval_qm_stored:
 
 getval_from_mag_ok:
         ; Parte fraccionaria en Q0.16: magnitud << (16 - n)
-        AND     R5, R5, #0
-        ADD     R5, R5, #8
-        ADD     R5, R5, #8
+        LD      R5, getval_16
         LD      R3, getval_n
         NOT     R3, R3
         ADD     R3, R3, #1
@@ -157,7 +153,7 @@ getval_shr_int:
 
         ; 4. Formatear con TODEC e imprimir "[ <valor> ]\n"
 getval_out:
-        LEA     R2, getval_buf
+        LD      R2, getval_buf_ads
         AND     R3, R3, #0              ; Formato = 0
         LD      R4, sub_todec
         JSRR    R4                      ; R2 = puntero al buffer formateado
@@ -197,6 +193,10 @@ getval_r4:          .FILL #0
 getval_r5:          .FILL #0
 getval_r7:          .FILL #0
 
+getval_16:          .FILL #16
+
+getval_buf_ads:     .FILL getval_buf
+getval_buf_end_ads: .FILL getval_buf_end
 getval_buf:         .BLKW #16
 getval_buf_end:
 

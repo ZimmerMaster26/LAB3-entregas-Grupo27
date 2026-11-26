@@ -16,9 +16,7 @@ SUB_BASE_BIN:
         LEA     R0, BASE_BIN_LBL
         PUTS
 
-        AND     R3, R3, #0
-        ADD     R3, R3, #8
-        ADD     R3, R3, #8          ; R3 = contador de 16 bits
+        LD      R3, BASE_VAL_16     ; R3 = contador de 16 bits
 
 BASE_BIN_BUCLE:
         LSHO    R0, R2, #1          ; Bit [15] de R2 pasa a bit [0] de R0
@@ -103,6 +101,7 @@ BASE_NL:        .FILL #10
 BASE_CHR_0:     .FILL #48
 BASE_HEX_A_OFF: .FILL #55
 BASE_NEG_10:    .FILL #-10
+BASE_VAL_16:    .FILL #16
 
 BASE_SAVE_R0:   .FILL #0
 BASE_SAVE_R2:   .FILL #0

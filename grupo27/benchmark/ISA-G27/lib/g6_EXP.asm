@@ -155,8 +155,9 @@ EXP_SHIFT_RIGHT:
         ; Aquí R1 = k - 7 está en [-19, -1].
         ; Sea n = -(k - 7) = 7 - k (en [1, 19]).
         ; Si R1 < -16 (es decir, n > 16), el resultado redondeado es 0.
-        ADD     R2, R1, #8
-        ADD     R2, R2, #8          ; R2 = (k - 7) + 16 = 16 - n
+        ADD     R2, R1, #7
+        ADD     R2, R2, #7
+        ADD     R2, R2, #2          ; R2 = (k - 7) + 16 = 16 - n
         BRn     EXP_UNDERFLOW       ; Si n > 16 -> underflow a 0
 
         ; Extraer bit de redondeo (bit n - 1 de R3) usando SHR con desplazamiento -(n - 1) = R1 + 1:

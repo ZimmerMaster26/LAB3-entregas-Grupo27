@@ -13,8 +13,7 @@ PAUSE                                   ;
     LEA R0 pause_prompt                 ;
     PUTS                                ;   print("Pulsa una tecla para continuar...")
     GETC                                ;   getc()
-    AND R0 R0 #0                        ;
-    ADD R0 R0 #10                       ;   
+    LD R0 pause_endl                    ;   
     OUT                                 ;   print("\n")
 
     LD R0 pause_r0                      ;
@@ -24,5 +23,6 @@ PAUSE                                   ;
 pause_r0      .FILL #0
 pause_r7      .FILL #0
 pause_prompt  .STRINGZ "Pulsa una tecla para continuar..."
+pause_endl    .FILLB #10
 
 .END

@@ -9,124 +9,153 @@
 ;                        (termina con op_idx = 0 -> SALIR)
 ;   Conserva: R0-R7 (todos intactos, incluyendo R6).
 ;=====================================================================
-.EXTERNAL GETCFILTERED-GETCFILTERED
-.EXTERNAL FROMHEX-FROMHEX
-.EXTERNAL PAUSE-PAUSE
-.EXTERNAL GETVAL-GETVAL
-.EXTERNAL OUTVAL-OUTVAL
+.EXTERNAL g27_getcfiltered-GETCFILTERED
+.EXTERNAL g27_fromhex-FROMHEX
+.EXTERNAL g27_pause-PAUSE
+.EXTERNAL g27_getval-GETVAL
+.EXTERNAL g27_outval-OUTVAL
 
-.EXTERNAL cordic_division-CORDIC_DIV_Q15
-.EXTERNAL MultiplicacionSHIFTandADD-MUL_Q7_8_SHIFT_ADD
-.EXTERNAL potencia-EXP_RAPIDA
-.EXTERNAL Mul_Sucesiva_POW-Mul_Sucesiva_POW
-.EXTERNAL EXP-EXP_Q3_12
-.EXTERNAL mcm-MCM
-.EXTERNAL mcd-MCD
-.EXTERNAL sqrt_nr_dq16-SQRT_NR_DQ16
-.EXTERNAL division_larga-DIV_LONG
-.EXTERNAL CORDICLog-CORDIC_LOG_BASE
-.EXTERNAL subrutina_grupo_12-DIV_NEWTON
-.EXTERNAL log_borchardt_q8_7-LN_Q8_7
-.EXTERNAL G15_Q312_Q78-G15_Q312_Q78
-.EXTERNAL booth-MULT_BOOTH
-.EXTERNAL cordic_multiplicacion-CORDIC_MUL
-.EXTERNAL Cordic_reduccion_de_argumento-Reduccion_Argumento
-.EXTERNAL senotaylor_subrutina-CALCULAR_SENO
-.EXTERNAL Tabla_SIN_y_COS-SENO_TABLA
-.EXTERNAL Tabla_SIN_y_COS-COSENO_TABLA
-.EXTERNAL modulo_sqrt_nr-SQRT_NR
-.EXTERNAL conversor_lc3_max-SUB_BASE_HEX
-.EXTERNAL conversor_lc3_max-SUB_BASE_BIN
-.EXTERNAL seno_cheb_pade-SEN_CHEB_PADE
+.EXTERNAL g1_cordic_division-CORDIC_DIV_Q15
+.EXTERNAL g3_MultiplicacionSHIFTandADD-MUL_Q7_8_SHIFT_ADD
+.EXTERNAL g4_potencia-EXP_RAPIDA
+.EXTERNAL g5_Mul_Sucesiva_POW-Mul_Sucesiva_POW
+.EXTERNAL g6_EXP-EXP_Q3_12
+.EXTERNAL g7_mcm-MCM
+.EXTERNAL g7_mcd-MCD
+.EXTERNAL g9_sqrt_nr_dq16-SQRT_NR_DQ16
+.EXTERNAL g10_division_larga-DIV_LONG
+.EXTERNAL g11_CORDICLog-CORDIC_LOG_BASE
+.EXTERNAL g12_subrutina_grupo_12-DIV_NEWTON
+.EXTERNAL g14_log_borchardt_q8_7-LN_Q8_7
+.EXTERNAL g15_G15_Q312_Q78-G15_Q312_Q78
+.EXTERNAL g18_booth-MULT_BOOTH
+.EXTERNAL g19_cordic_multiplicacion-CORDIC_MUL
+.EXTERNAL g20_Cordic_reduccion_de_argumento-Reduccion_Argumento
+.EXTERNAL g21_senotaylor_subrutina-CALCULAR_SENO
+.EXTERNAL g22_Tabla_SIN_y_COS-SENO_TABLA
+.EXTERNAL g22_Tabla_SIN_y_COS-COSENO_TABLA
+.EXTERNAL g23_modulo_sqrt_nr-SQRT_NR
+.EXTERNAL g24_conversor_lc3_max-SUB_BASE_HEX
+.EXTERNAL g24_conversor_lc3_max-SUB_BASE_BIN
+.EXTERNAL g30_seno_cheb_pade-SEN_CHEB_PADE
 
 MAIN_MENU:
-        ST      R0, main_menu_r0
-        ST      R1, main_menu_r1
-        ST      R2, main_menu_r2
-        ST      R3, main_menu_r3
-        ST      R4, main_menu_r4
-        ST      R5, main_menu_r5
-        ST      R7, main_menu_r7
+        ST      R0, mm_r0
+        ST      R1, mm_r1
+        ST      R2, mm_r2
+        ST      R3, mm_r3
+        ST      R4, mm_r4
+        ST      R5, mm_r5
+        ST      R7, mm_r7
 
         AND     R1, R1, #0
         ADD     R1, R1, #1
-        ST      R1, main_menu_op_verbose    ; verbose_op = 1 por defecto
+        ST      R1, mm_verbose
 
         ADD     R0, R0, #0
-        BRz     main_menu_sk1               ; R0 == 0 -> modo interactivo
+        BRz     main_menu_sk1
 
-        LDR     R1, R0, #0                  ; Leer modalidad (word 0)
-        ST      R1, main_menu_op_verbose
-        ADD     R0, R0, #2                  ; Avanzar 1 word (2 bytes) al primer índice
+        LDR     R1, R0, #0
+        ST      R1, mm_verbose
+        ADD     R0, R0, #2
 
 main_menu_sk1:
-        ST      R0, main_menu_op_cursor
+        ST      R0, mm_cursor
 
-        LD      R0, main_menu_state_initial
-        ST      R0, main_menu_state
+        LD      R0, mm_state_init_ptr
+        ST      R0, mm_state
         LDR     R0, R0, #0
-        JMP     R0                          ; Saltar a init.controlador
+        JMP     R0
 
-; --- Cambio de estado al siguiente nodo ---
-; Entrada: R0 = índice de opción (0, 1, 2, ...)
 main_menu_swap_node:
-        LSH     R0, R0, #1                  ; Escalar índice de palabra a bytes (* 2)
-        LD      R5, main_menu_state
-        LDR     R1, R5, #3                  ; R1 = puntero al vector nodo.next
+        LSH     R0, R0, #1
+        LD      R5, mm_state
+        LDR     R1, R5, #3
         ADD     R1, R1, R0
-        LDR     R5, R1, #0                  ; R5 = nodo.next[opcion]
-        ST      R5, main_menu_state
+        LDR     R5, R1, #0
+        ST      R5, mm_state
         LDR     R0, R5, #0
         JMP     R0
 
-; --- Retorno de MAIN_MENU ---
 main_menu_return:
-        LD      R0, main_menu_r0
-        LD      R1, main_menu_r1
-        LD      R2, main_menu_r2
-        LD      R3, main_menu_r3
-        LD      R4, main_menu_r4
-        LD      R5, main_menu_r5
-        LD      R7, main_menu_r7
+        LD      R0, mm_r0
+        LD      R1, mm_r1
+        LD      R2, mm_r2
+        LD      R3, mm_r3
+        LD      R4, mm_r4
+        LD      R5, mm_r5
+        LD      R7, mm_r7
         RET
+
+; --- Datos locales de MAIN_MENU / swap_node / return ---
+mm_r0:                  .FILL #0
+mm_r1:                  .FILL #0
+mm_r2:                  .FILL #0
+mm_r3:                  .FILL #0
+mm_r4:                  .FILL #0
+mm_r5:                  .FILL #0
+mm_r7:                  .FILL #0
+mm_verbose:             .FILL #0
+mm_cursor:              .FILL #0
+mm_state:               .FILL #0
+mm_state_init_ptr:      .FILL main_menu_init
 
 ; --- Controlador: mostrar menú o despachar operación del bloque ---
 main_menu_show_menu:
-        LD      R1, main_menu_op_cursor     ; LD actualiza NZP
-        BRz     main_menu_show_menu_sk1     ; cursor == 0 -> modo interactivo
+        LD      R1, mm_sm_cursor
+        BRz     main_menu_show_menu_sk1
 
-        LDR     R0, R1, #0                  ; R0 = índice de operación del bloque
-        ADD     R1, R1, #2                  ; Avanzar 1 word (2 bytes)
-        ST      R1, main_menu_op_cursor
+        LDR     R0, R1, #0
+        ADD     R1, R1, #2
+        ST      R1, mm_sm_cursor
 
-        LSH     R0, R0, #1                  ; Offset en bytes (* 2)
-        LD      R5, main_menu_op_table_ads
+        LSH     R0, R0, #1
+        LD      R5, mm_sm_op_table
         ADD     R5, R5, R0
-        LDR     R5, R5, #0                  ; R5 = tabla_de_nodos[indice]
-        ST      R5, main_menu_state
+        LDR     R5, R5, #0
+        ST      R5, mm_sm_state
 
         LDR     R0, R5, #0
         JMP     R0
 
 main_menu_show_menu_sk1:
-        LD      R5, main_menu_state
-        LDR     R0, R5, #1                  ; nodo.texto
+        LD      R5, mm_sm_state
+        LDR     R0, R5, #1
         PUTS
 
-        LDR     R0, R5, #2                  ; nodo.filtro (cadena de 8 bits)
-        LD      R1, sub_getcfiltered
-        JSRR    R1                          ; R0 = carácter válido (8 bits)
+        LDR     R0, R5, #2
+        LD      R1, mm_sm_getcfiltered
+        JSRR    R1
 
-        ; Armar cadena de 2 bytes: [char, '\0'] usando STRB
-        LEA     R1, main_menu_aux_0
+        LEA     R1, mm_sm_aux0
         STRB    R0, R1, #0
         AND     R2, R2, #0
         STRB    R2, R1, #1
 
         ADD     R0, R1, #0
-        LD      R1, sub_fromhex
-        JSRR    R1                          ; R0 = índice entero
-        BR      main_menu_swap_node
+        LD      R1, mm_sm_fromhex
+        JSRR    R1
+        LD      R1, mm_sm_swap_node
+        JMP     R1
+
+; --- Datos locales de show_menu ---
+mm_sm_cursor:           .FILL mm_cursor
+mm_sm_op_table:         .FILL main_menu_op_table
+mm_sm_state:            .FILL mm_state
+mm_sm_aux0:             .FILL #0
+mm_sm_getcfiltered:     .FILL g27_getcfiltered-GETCFILTERED
+mm_sm_fromhex:          .FILL g27_fromhex-FROMHEX
+mm_sm_swap_node:        .FILL main_menu_swap_node
+
+; --- Constantes de formatos Q ---
+mm_k7:                  .FILL #7
+mm_k8:                  .FILL #8
+mm_k9:                  .FILL #9
+mm_k12:                 .FILL #12
+mm_k14:                 .FILL #14
+mm_k15:                 .FILL #15
+mm_k16:                 .FILL #16
+mm_call_ptr:            .FILL main_menu_call
 
 ; --- Controladores de aridad y formatos Q ---
 main_menu_one_int_noresult:
@@ -134,343 +163,320 @@ main_menu_one_int_noresult:
         AND     R1, R1, #0
         ADD     R1, R1, #-1
         ADD     R2, R1, #0
-        BR      main_menu_call
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_one_int_result_q12:
         AND     R0, R0, #0
         AND     R1, R1, #0
         ADD     R1, R1, #-1
-        AND     R2, R2, #0
-        ADD     R2, R2, #12
-        BR      main_menu_call
+        LD      R2, mm_k12
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_two_int:
         AND     R0, R0, #0
         AND     R1, R1, #0
         AND     R2, R2, #0
-        BR      main_menu_call
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_one_q12:
-        AND     R0, R0, #0
-        ADD     R0, R0, #12
+        LD      R0, mm_k12
         AND     R1, R1, #0
         ADD     R1, R1, #-1
         ADD     R2, R0, #0
-        BR      main_menu_call
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_one_q12_result_q8:
-        AND     R0, R0, #0
-        ADD     R0, R0, #12
+        LD      R0, mm_k12
         AND     R1, R1, #0
         ADD     R1, R1, #-1
-        AND     R2, R2, #0
-        ADD     R2, R2, #8
-        BR      main_menu_call
+        LD      R2, mm_k8
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_one_q12_result_q14:
-        AND     R0, R0, #0
-        ADD     R0, R0, #12
+        LD      R0, mm_k12
         AND     R1, R1, #0
         ADD     R1, R1, #-1
-        AND     R2, R2, #0
-        ADD     R2, R2, #14
-        BR      main_menu_call
+        LD      R2, mm_k14
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_one_q7:
-        AND     R0, R0, #0
-        ADD     R0, R0, #7
+        LD      R0, mm_k7
         AND     R1, R1, #0
         ADD     R1, R1, #-1
         ADD     R2, R0, #0
-        BR      main_menu_call
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_one_q8:
-        AND     R0, R0, #0
-        ADD     R0, R0, #8
+        LD      R0, mm_k8
         AND     R1, R1, #0
         ADD     R1, R1, #-1
         ADD     R2, R0, #0
-        BR      main_menu_call
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_q8_int_result_q8:
-        AND     R0, R0, #0
-        ADD     R0, R0, #8
+        LD      R0, mm_k8
         AND     R1, R1, #0
         ADD     R2, R0, #0
-        BR      main_menu_call
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_one_q8_result_q9:
-        AND     R0, R0, #0
-        ADD     R0, R0, #8
+        LD      R0, mm_k8
         AND     R1, R1, #0
         ADD     R1, R1, #-1
-        AND     R2, R2, #0
-        ADD     R2, R2, #9
-        BR      main_menu_call
+        LD      R2, mm_k9
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_two_q8:
-        AND     R0, R0, #0
-        ADD     R0, R0, #8
+        LD      R0, mm_k8
         ADD     R1, R0, #0
         ADD     R2, R0, #0
-        BR      main_menu_call
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_two_q15:
-        AND     R0, R0, #0
-        ADD     R0, R0, #15
+        LD      R0, mm_k15
         ADD     R1, R0, #0
         ADD     R2, R0, #0
-        BR      main_menu_call
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_one_dq16:
-        AND     R0, R0, #0
-        ADD     R0, R0, #8
-        ADD     R0, R0, #8
+        LD      R0, mm_k16
         AND     R1, R1, #0
         ADD     R1, R1, #-1
         ADD     R2, R0, #0
-        BR      main_menu_call
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 main_menu_two_q8_result_dq16:
-        AND     R0, R0, #0
-        ADD     R0, R0, #8
+        LD      R0, mm_k8
         ADD     R1, R0, #0
-        AND     R2, R2, #0
-        ADD     R2, R2, #8
-        ADD     R2, R2, #8
-        BR      main_menu_call
+        LD      R2, mm_k16
+        LD      R3, mm_call_ptr
+        JMP     R3
 
 ; --- Controlador de ejecución en modo interactivo ---
 main_menu_call:
-        LD      R4, main_menu_op_cursor     ; LD actualiza NZP
-        BRnp    main_menu_call_op
+        LD      R4, mm_ic_cursor
+        BRz     main_menu_call_inter
+        LD      R1, mm_ic_call_op
+        JMP     R1
 
-        ST      R0, main_menu_aux_2
-        ST      R1, main_menu_aux_3
-        ST      R2, main_menu_aux_4
+main_menu_call_inter:
+        ST      R0, mm_ic_aux2
+        ST      R1, mm_ic_aux3
+        ST      R2, mm_ic_aux4
 
-        LD      R5, main_menu_state
+        LD      R5, mm_ic_state
         LDR     R0, R5, #1
         PUTS
 
 main_menu_call_get1:
-        LD      R1, main_menu_aux_2
+        LD      R1, mm_ic_aux2
         BRn     main_menu_call_get2
 
         LSH     R1, R1, #1
-        LD      R0, main_menu_prompt_qa_vec
+        LD      R0, mm_ic_qa_vec
         ADD     R0, R0, R1
         LDR     R0, R0, #0
         PUTS
 
-        LD      R0, main_menu_aux_2
-        LD      R1, sub_getval
+        LD      R0, mm_ic_aux2
+        LD      R1, mm_ic_getval
         JSRR    R1
-        ST      R0, main_menu_aux_0
-        ST      R1, main_menu_aux_1
+        ST      R0, mm_ic_aux0
+        ST      R1, mm_ic_aux1
 
 main_menu_call_get2:
-        LD      R1, main_menu_aux_3
+        LD      R1, mm_ic_aux3
         BRn     main_menu_call_exec
 
         LSH     R1, R1, #1
-        LD      R0, main_menu_prompt_qb_vec
+        LD      R0, mm_ic_qb_vec
         ADD     R0, R0, R1
         LDR     R0, R0, #0
         PUTS
 
-        LD      R0, main_menu_aux_3
-        LD      R1, sub_getval
+        LD      R0, mm_ic_aux3
+        LD      R1, mm_ic_getval
         JSRR    R1
-        ST      R0, main_menu_aux_1
+        ST      R0, mm_ic_aux1
 
 main_menu_call_exec:
-        LD      R0, main_menu_aux_0
-        LD      R1, main_menu_aux_1
+        LD      R0, mm_ic_aux0
+        LD      R1, mm_ic_aux1
         LDR     R2, R5, #4
         LDR     R2, R2, #0
         JSRR    R2
-        ST      R0, main_menu_aux_0
-        ST      R1, main_menu_aux_1
+        ST      R0, mm_ic_aux0
+        ST      R1, mm_ic_aux1
 
 main_menu_call_out:
-        LD      R1, main_menu_aux_4
+        LD      R1, mm_ic_aux4
         BRn     main_menu_call_next
 
         LSH     R1, R1, #1
-        LD      R0, main_menu_prompt_q_vec
+        LD      R0, mm_ic_q_vec
         ADD     R0, R0, R1
         LDR     R0, R0, #0
         PUTS
 
-        LD      R0, main_menu_aux_0
-        LD      R1, main_menu_aux_1
-        LD      R2, main_menu_aux_4
-        LD      R3, sub_outval
+        LD      R0, mm_ic_aux0
+        LD      R1, mm_ic_aux1
+        LD      R2, mm_ic_aux4
+        LD      R3, mm_ic_outval
         JSRR    R3
 
 main_menu_call_next:
-        LD      R0, sub_pause
+        LD      R0, mm_ic_pause
         JSRR    R0
 
         AND     R0, R0, #0
-        BR      main_menu_swap_node
+        LD      R1, mm_ic_swap_node
+        JMP     R1
 
-;=====================================================================
-; VARIABLES CENTRALES Y PUNTEROS (AL CENTRO PARA PCOFFSET8 VÁLIDO)
-;=====================================================================
-main_menu_r0:               .FILL #0
-main_menu_r1:               .FILL #0
-main_menu_r2:               .FILL #0
-main_menu_r3:               .FILL #0
-main_menu_r4:               .FILL #0
-main_menu_r5:               .FILL #0
-main_menu_r7:               .FILL #0
-main_menu_op_verbose:       .FILL #0
-main_menu_op_cursor:        .FILL #0
-main_menu_state_initial:    .FILL main_menu_init
-main_menu_state:            .FILL #0
-main_menu_prompt_qa_vec:    .FILL main_menu_prompt_qa_text_vec
-main_menu_prompt_qb_vec:    .FILL main_menu_prompt_qb_text_vec
-main_menu_prompt_q_vec:     .FILL main_menu_prompt_q_text_vec
-main_menu_aux_0:            .FILL #0
-main_menu_aux_1:            .FILL #0
-main_menu_aux_2:            .FILL #0
-main_menu_aux_3:            .FILL #0
-main_menu_aux_4:            .FILL #0
-
-main_menu_swap_node_ads:    .FILL main_menu_swap_node
-main_menu_op_table_ads:     .FILL main_menu_op_table
-
-sub_getcfiltered:           .FILL GETCFILTERED-GETCFILTERED
-sub_fromhex:                .FILL FROMHEX-FROMHEX
-sub_pause:                  .FILL PAUSE-PAUSE
-sub_getval:                 .FILL GETVAL-GETVAL
-sub_outval:                 .FILL OUTVAL-OUTVAL
-
-sub_mult_cordic:            .FILL cordic_multiplicacion-CORDIC_MUL
-sub_mult_basic:             .FILL MultiplicacionSHIFTandADD-MUL_Q7_8_SHIFT_ADD
-sub_mult_booth:             .FILL booth-MULT_BOOTH
-sub_div_long:               .FILL division_larga-DIV_LONG
-sub_div_nr:                 .FILL subrutina_grupo_12-DIV_NEWTON
-sub_div_cordic:             .FILL cordic_division-CORDIC_DIV_Q15
-sub_log_borch:              .FILL log_borchardt_q8_7-LN_Q8_7
-sub_log_cordic:             .FILL CORDICLog-CORDIC_LOG_BASE
-sub_sqrt_nonres:            .FILL modulo_sqrt_nr-SQRT_NR
-sub_sqrt_nr:                .FILL sqrt_nr_dq16-SQRT_NR_DQ16
-sub_exp:                    .FILL EXP-EXP_Q3_12
-sub_pow_mults:              .FILL Mul_Sucesiva_POW-Mul_Sucesiva_POW
-sub_pow_expbin:             .FILL potencia-EXP_RAPIDA
-sub_sin_taylor:             .FILL senotaylor_subrutina-CALCULAR_SENO
-sub_sin_table:              .FILL Tabla_SIN_y_COS-SENO_TABLA
-sub_sin_cheb:               .FILL seno_cheb_pade-SEN_CHEB_PADE
-sub_cos:                    .FILL Tabla_SIN_y_COS-COSENO_TABLA
-sub_base_hex:               .FILL conversor_lc3_max-SUB_BASE_HEX
-sub_base_bin:               .FILL conversor_lc3_max-SUB_BASE_BIN
-sub_mcd:                    .FILL mcd-MCD
-sub_mcm:                    .FILL mcm-MCM
-sub_argrd:                  .FILL Cordic_reduccion_de_argumento-Reduccion_Argumento
-sub_qtoq:                   .FILL G15_Q312_Q78-G15_Q312_Q78
+; --- Datos locales de call (modo interactivo) ---
+mm_ic_cursor:           .FILL mm_cursor
+mm_ic_state:            .FILL mm_state
+mm_ic_call_op:          .FILL main_menu_call_op
+mm_ic_swap_node:        .FILL main_menu_swap_node
+mm_ic_qa_vec:           .FILL main_menu_prompt_qa_text_vec
+mm_ic_qb_vec:           .FILL main_menu_prompt_qb_text_vec
+mm_ic_q_vec:            .FILL main_menu_prompt_q_text_vec
+mm_ic_getval:           .FILL g27_getval-GETVAL
+mm_ic_outval:           .FILL g27_outval-OUTVAL
+mm_ic_pause:            .FILL g27_pause-PAUSE
+mm_ic_aux0:             .FILL #0
+mm_ic_aux1:             .FILL #0
+mm_ic_aux2:             .FILL #0
+mm_ic_aux3:             .FILL #0
+mm_ic_aux4:             .FILL #0
 
 ; --- Controlador de ejecución en modo bloque de operaciones ---
 main_menu_call_op:
-        ST      R0, main_menu_aux_2
-        ST      R1, main_menu_aux_3
-        ST      R2, main_menu_aux_4
+        ST      R0, mm_op_aux2
+        ST      R1, mm_op_aux3
+        ST      R2, mm_op_aux4
 
-        LD      R5, main_menu_state
-        LD      R4, main_menu_op_cursor
+        LD      R5, mm_op_state
+        LD      R4, mm_op_cursor
 
-        LDR     R0, R4, #0                  ; arg_a (word 0)
-        ST      R0, main_menu_aux_0
-        LDR     R0, R4, #1                  ; arg_b / frac_a (word 1)
-        ST      R0, main_menu_aux_1
+        LDR     R0, R4, #0
+        ST      R0, mm_op_aux0
+        LDR     R0, R4, #1
+        ST      R0, mm_op_aux1
 
-        LD      R0, main_menu_op_verbose
+        LD      R0, mm_op_verbose
         BRz     main_menu_call_op_exec
 
         LDR     R0, R5, #1
         PUTS
 
 main_menu_call_op_show1:
-        LD      R1, main_menu_aux_2
+        LD      R1, mm_op_aux2
         BRn     main_menu_call_op_show2
 
         LSH     R1, R1, #1
-        LD      R0, main_menu_prompt_q_vec
+        LD      R0, mm_op_q_vec
         ADD     R0, R0, R1
         LDR     R0, R0, #0
         PUTS
 
-        LD      R0, main_menu_aux_0
-        LD      R1, main_menu_aux_1
-        LD      R2, main_menu_aux_2
-        LD      R3, sub_outval
+        LD      R0, mm_op_aux0
+        LD      R1, mm_op_aux1
+        LD      R2, mm_op_aux2
+        LD      R3, mm_op_outval
         JSRR    R3
 
 main_menu_call_op_show2:
-        LD      R1, main_menu_aux_3
+        LD      R1, mm_op_aux3
         BRn     main_menu_call_op_exec
 
         LSH     R1, R1, #1
-        LD      R0, main_menu_prompt_q_vec
+        LD      R0, mm_op_q_vec
         ADD     R0, R0, R1
         LDR     R0, R0, #0
         PUTS
 
-        LD      R0, main_menu_aux_1
+        LD      R0, mm_op_aux1
         AND     R1, R1, #0
-        LD      R2, main_menu_aux_3
-        LD      R3, sub_outval
+        LD      R2, mm_op_aux3
+        LD      R3, mm_op_outval
         JSRR    R3
 
 main_menu_call_op_exec:
-        LD      R0, main_menu_aux_0
-        LD      R1, main_menu_aux_1
+        LD      R0, mm_op_aux0
+        LD      R1, mm_op_aux1
         LDR     R2, R5, #4
         LDR     R2, R2, #0
         JSRR    R2
-        ST      R0, main_menu_aux_0
-        ST      R1, main_menu_aux_1
+        ST      R0, mm_op_aux0
+        ST      R1, mm_op_aux1
 
-        LD      R0, main_menu_op_verbose
+        LD      R0, mm_op_verbose
         BRz     main_menu_call_op_save_result
 
-        LD      R1, main_menu_aux_4
+        LD      R1, mm_op_aux4
         BRn     main_menu_call_op_save_result
 
         LSH     R1, R1, #1
-        LD      R0, main_menu_prompt_q_vec
+        LD      R0, mm_op_q_vec
         ADD     R0, R0, R1
         LDR     R0, R0, #0
         PUTS
 
-        LD      R0, main_menu_aux_0
-        LD      R1, main_menu_aux_1
-        LD      R2, main_menu_aux_4
-        LD      R3, sub_outval
+        LD      R0, mm_op_aux0
+        LD      R1, mm_op_aux1
+        LD      R2, mm_op_aux4
+        LD      R3, mm_op_outval
         JSRR    R3
 
 main_menu_call_op_save_result:
-        LD      R0, main_menu_aux_4
-        ADD     R0, R0, #-8
-        ADD     R0, R0, #-8
+        LD      R0, mm_op_aux4
+        LD      R1, mm_op_neg16
+        ADD     R0, R0, R1
         BRz     main_menu_call_op_save_sk1
         AND     R0, R0, #0
-        ST      R0, main_menu_aux_1
+        ST      R0, mm_op_aux1
 
 main_menu_call_op_save_sk1:
-        LD      R0, main_menu_aux_0
-        LD      R1, main_menu_aux_1
-        STR     R0, R4, #2                  ; res_0 (word 2)
-        STR     R1, R4, #3                  ; res_1 (word 3)
+        LD      R0, mm_op_aux0
+        LD      R1, mm_op_aux1
+        STR     R0, R4, #2
+        STR     R1, R4, #3
 
-        ADD     R4, R4, #8                  ; Avanzar 4 words (8 bytes)
-        ST      R4, main_menu_op_cursor
+        LD      R1, mm_op_k8
+        ADD     R4, R4, R1
+        ST      R4, mm_op_cursor
 
         AND     R0, R0, #0
-        LD      R1, main_menu_swap_node_ads
+        LD      R1, mm_op_swap_node
         JMP     R1
+
+; --- Datos locales de call_op (modo bloque) ---
+mm_op_verbose:          .FILL mm_verbose
+mm_op_cursor:           .FILL mm_cursor
+mm_op_state:            .FILL mm_state
+mm_op_swap_node:        .FILL main_menu_swap_node
+mm_op_q_vec:            .FILL main_menu_prompt_q_text_vec
+mm_op_outval:           .FILL g27_outval-OUTVAL
+mm_op_neg16:            .FILL #-16
+mm_op_k8:               .FILL #8
+mm_op_aux0:             .FILL #0
+mm_op_aux1:             .FILL #0
+mm_op_aux2:             .FILL #0
+mm_op_aux3:             .FILL #0
+mm_op_aux4:             .FILL #0
 
 ;=====================================================================
 ; VECTORES DE PROMPTS Y CADENAS DE 8 BITS (.STRINGZ)
@@ -559,7 +565,7 @@ main_menu_prompt_q5b_text:  .STRINGZ "b (Q10.5) > "
 main_menu_prompt_q6b_text:  .STRINGZ "b (Q9.6) > "
 main_menu_prompt_q7b_text:  .STRINGZ "b (Q8.7) > "
 main_menu_prompt_q8b_text:  .STRINGZ "b (Q7.8) > "
-main_menu_prompt_q9b_text:  .FILL main_menu_prompt_q9b_text_str
+main_menu_prompt_q9b_text:  .STRINGZ "b (Q6.9) > "
 main_menu_prompt_q10b_text: .STRINGZ "b (Q5.10) > "
 main_menu_prompt_q11b_text: .STRINGZ "b (Q4.11) > "
 main_menu_prompt_q12b_text: .STRINGZ "b (Q3.12) > "
@@ -567,7 +573,6 @@ main_menu_prompt_q13b_text: .STRINGZ "b (Q2.13) > "
 main_menu_prompt_q14b_text: .STRINGZ "b (Q1.14) > "
 main_menu_prompt_q15b_text: .STRINGZ "b (Q0.15) > "
 main_menu_prompt_q16b_text: .STRINGZ "b (Q15.16) > "
-main_menu_prompt_q9b_text_str: .STRINGZ "b (Q6.9) > "
 
 main_menu_prompt_q0_text:   .STRINGZ "(int) "
 main_menu_prompt_q1_text:   .STRINGZ "(Q14.1) "
@@ -584,8 +589,36 @@ main_menu_prompt_q11_text:  .STRINGZ "(Q4.11) "
 main_menu_prompt_q12_text:  .STRINGZ "(Q3.12) "
 main_menu_prompt_q13_text:  .STRINGZ "(Q2.13) "
 main_menu_prompt_q14_text:  .STRINGZ "(Q1.14) "
-main_menu_prompt_q15_text:  .STRINGZ "(Q0.15) "
+main_menu_prompt_q15_text:  .FILL main_menu_prompt_q15_text_str
 main_menu_prompt_q16_text:  .STRINGZ "(Q15.16) "
+main_menu_prompt_q15_text_str: .STRINGZ "(Q0.15) "
+
+;=====================================================================
+; PUNTEROS A SUBRUTINAS EXTERNAS
+;=====================================================================
+sub_mult_cordic:        .FILL g19_cordic_multiplicacion-CORDIC_MUL
+sub_mult_basic:         .FILL g3_MultiplicacionSHIFTandADD-MUL_Q7_8_SHIFT_ADD
+sub_mult_booth:         .FILL g18_booth-MULT_BOOTH
+sub_div_long:           .FILL g10_division_larga-DIV_LONG
+sub_div_nr:             .FILL g12_subrutina_grupo_12-DIV_NEWTON
+sub_div_cordic:         .FILL g1_cordic_division-CORDIC_DIV_Q15
+sub_log_borch:          .FILL g14_log_borchardt_q8_7-LN_Q8_7
+sub_log_cordic:         .FILL g11_CORDICLog-CORDIC_LOG_BASE
+sub_sqrt_nonres:        .FILL g23_modulo_sqrt_nr-SQRT_NR
+sub_sqrt_nr:            .FILL g9_sqrt_nr_dq16-SQRT_NR_DQ16
+sub_exp:                .FILL g6_EXP-EXP_Q3_12
+sub_pow_mults:          .FILL g5_Mul_Sucesiva_POW-Mul_Sucesiva_POW
+sub_pow_expbin:         .FILL g4_potencia-EXP_RAPIDA
+sub_sin_taylor:         .FILL g21_senotaylor_subrutina-CALCULAR_SENO
+sub_sin_table:          .FILL g22_Tabla_SIN_y_COS-SENO_TABLA
+sub_sin_cheb:           .FILL g30_seno_cheb_pade-SEN_CHEB_PADE
+sub_cos:                .FILL g22_Tabla_SIN_y_COS-COSENO_TABLA
+sub_base_hex:           .FILL g24_conversor_lc3_max-SUB_BASE_HEX
+sub_base_bin:           .FILL g24_conversor_lc3_max-SUB_BASE_BIN
+sub_mcd:                .FILL g7_mcd-MCD
+sub_mcm:                .FILL g7_mcm-MCM
+sub_argrd:              .FILL g20_Cordic_reduccion_de_argumento-Reduccion_Argumento
+sub_qtoq:               .FILL g15_G15_Q312_Q78-G15_Q312_Q78
 
 ;=====================================================================
 ; TABLA DEL VECTOR DE OPERACIONES (0..23)

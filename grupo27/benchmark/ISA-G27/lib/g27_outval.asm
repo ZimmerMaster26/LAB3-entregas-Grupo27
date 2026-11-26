@@ -7,9 +7,9 @@
 ;   Salida:   Imprime el valor formateado seguido de '\n' en consola.
 ;   Conserva: R0-R7 (todos intactos, incluyendo R6).
 ;=====================================================================
-.EXTERNAL TODEC-TODEC
+.EXTERNAL g27_todec-TODEC
 
-sub_todec:      .FILL TODEC-TODEC
+sub_todec:      .FILL g27_todec-TODEC
 
 OUTVAL:
         ST      R0, outval_r0

@@ -436,6 +436,7 @@ class ModuleAST:
         self.symbols = {}
         self.symbol_names = {}
         self.external_imports = {}
+        self.external_symbols = {}
         self.start_address = 0
         self.end_address = 0
         self.external_dependencies = []
@@ -611,7 +612,7 @@ class Assembler:
         self._assemble_external_pseudoops(modules_ast, modules_by_norm)
 
         # Segunda pasada: generación de instrucciones y bytes
-        emitted_bytes = self._pass_2(modules_ast, modules_by_norm, orig_address)
+        emitted_bytes = self._pass_2(modules_ast)
 
         # Preparar bytes finales con o sin dirección de origen
         if inc_orig:
@@ -715,6 +716,19 @@ class Assembler:
             for fmt in getattr(pseudoop_cls, "FORMATS", ())
             for field in fmt
         )
+
+    def _pseudoop_padding(self, pline: ParsedLine, address: int) -> int:
+        pseudoop_cls = _pseudoop_class_for(pline.mnemonic)
+        if pseudoop_cls is None:
+            raise ValueError(f"Pseudo-operación no registrada: '{pline.mnemonic}'")
+        alignment = getattr(pseudoop_cls, "ALIGN", None)
+        if alignment is None or alignment is False:
+            return 0
+        if alignment is not True:
+            raise ValueError(
+                f"ALIGN inválido para '{pline.mnemonic}': se esperaba True, False o None"
+            )
+        return address & 1
 
     def _split_external_ref(self, ref: str) -> tuple:
         """Separa una referencia externa 'archivo-etiqueta' validando ambas partes."""
@@ -904,10 +918,17 @@ class Assembler:
                 f"La pseudo-operación '{pline.mnemonic}' no implementa s_asemble_method"
             )
         result = assemble_method(format_idx, arguments)
-        if not isinstance(result, dict) or "KIND" not in result or "DATA" not in result:
+        if not isinstance(result, dict) or "KIND" not in result:
             raise TypeError(
                 f"Retorno inválido de '{pline.mnemonic}': se esperaba un descriptor "
-                "con KIND y DATA"
+                "con KIND"
+            )
+        if result["KIND"] == "EXTERNAL":
+            return result
+        if "DATA" not in result:
+            raise TypeError(
+                f"Retorno inválido de '{pline.mnemonic}': falta DATA para "
+                f"KIND='{result['KIND']}'"
             )
         data = result["DATA"]
         if not isinstance(data, list) or any(
@@ -1104,6 +1125,14 @@ class Assembler:
                             orig_data = result["DATA"]
                             orig_address = (orig_data[0] << 8) | orig_data[1]
                             current_pc = orig_address
+                            pline.pad_bytes = self._run_at_source(
+                                mod.source_label,
+                                pline.line_num,
+                                self._pseudoop_padding,
+                                pline,
+                                current_pc,
+                            )
+                            current_pc += pline.pad_bytes
                             for lbl, lbl_line in pending_labels:
                                 self._register_symbol(
                                     symbol_table, mod, lbl, current_pc, lbl_line
@@ -1117,6 +1146,14 @@ class Assembler:
                             f"Tipo de pseudo-operación no soportado: '{kind}'",
                         )
 
+                    pline.pad_bytes = self._run_at_source(
+                        mod.source_label,
+                        pline.line_num,
+                        self._pseudoop_padding,
+                        pline,
+                        current_pc,
+                    )
+                    current_pc += pline.pad_bytes
                     try:
                         data_size = len(bytearray(result["DATA"]))
                     except (TypeError, ValueError) as error:
@@ -1125,7 +1162,6 @@ class Assembler:
                             pline.line_num,
                             f"DATA inválido en '{pline.mnemonic}': {error}",
                         ) from error
-                    pline.pad_bytes = 0
 
                 # Asignar dirección a las etiquetas pendientes
                 pline.address = current_pc
@@ -1181,20 +1217,8 @@ class Assembler:
                             f"(referenciada desde '{mod.name}')",
                         )
                     address = target_mod.symbols[lbl_key]
-                    result = self._run_at_source(
-                        mod.source_label,
-                        pline.line_num,
-                        self._assemble_pseudoop,
-                        pline,
-                        operands=[address],
-                    )
-                    if result["KIND"] != "EXTERNAL":
-                        raise self._source_error(
-                            mod.source_label,
-                            pline.line_num,
-                            f"'{pline.mnemonic}' retornó KIND='{result['KIND']}'",
-                        )
-                    pline.pseudoop_result = result
+                    mod.external_symbols[(norm_dep, lbl_key)] = address
+                    pline.pseudoop_result = {"KIND": "EXTERNAL", "DATA": []}
 
     def _register_symbol(self, symbol_table: dict, mod: ModuleAST, label: str,
                          address: int, line_num: int = None):
@@ -1214,12 +1238,12 @@ class Assembler:
     # Pasada 2: Generación de Código Máquina y Resolución de Operandos
     # -----------------------------------------------------------------------
 
-    def _pass_2(self, modules_ast: list, modules_by_norm: dict, orig_address: int) -> bytearray:
+    def _pass_2(self, modules_ast: list) -> bytearray:
         """Traduce cada línea a bytes de memoria en orden contiguo."""
         emitted_bytes = bytearray()
 
         for mod in modules_ast:
-            resolver = self._create_symbol_resolver(mod, modules_by_norm)
+            resolver = self._create_symbol_resolver(mod)
 
             for pline in mod.lines:
                 if pline.mnemonic is None:
@@ -1239,7 +1263,10 @@ class Assembler:
                     kind = pseudo_result["KIND"]
                     if kind == "END":
                         break
-                    if kind in ("ORIG", "EXTERNAL"):
+                    if kind == "EXTERNAL":
+                        continue
+                    if kind == "ORIG":
+                        emitted_bytes.extend(b"\x00" * pline.pad_bytes)
                         continue
                     if kind != "MEMORY":
                         raise self._source_error(
@@ -1297,7 +1324,7 @@ class Assembler:
 
         return emitted_bytes
 
-    def _create_symbol_resolver(self, mod: ModuleAST, modules_by_norm: dict):
+    def _create_symbol_resolver(self, mod: ModuleAST):
         """Crea una función de resolución aislada al módulo y sus .EXTERNAL declarados."""
         def resolve(sym_str: str) -> int:
             s = sym_str.strip()
@@ -1312,9 +1339,12 @@ class Assembler:
                 dep_file, dep_label = s.split('-', 1)
                 dep_key = (self._normalize_mod_name(dep_file), dep_label.strip().lower())
                 if dep_key in mod.external_imports:
-                    target_mod = modules_by_norm.get(dep_key[0])
-                    if target_mod is not None and dep_key[1] in target_mod.symbols:
-                        return target_mod.symbols[dep_key[1]]
+                    if dep_key in mod.external_symbols:
+                        return mod.external_symbols[dep_key]
+                    raise KeyError(
+                        f"Etiqueta externa '{sym_str}' declarada pero no enlazada "
+                        f"en el módulo '{mod.name}'"
+                    )
 
             # 3. Expresiones aritméticas simples: ETIQUETA + N o ETIQUETA - N
             m = re.match(r"^(.+)\s*([+-])\s*([^+\-\s]+)$", s)

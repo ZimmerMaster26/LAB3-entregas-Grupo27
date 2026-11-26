@@ -67,8 +67,9 @@ REGLAS DE ALINEACIÓN Y PADDING EN MEMORIA:
 - Las instrucciones ocupan exactamente 1 Word (2 Bytes) y comienzan en una
   dirección par; el ensamblador agrega padding solo antes de una instrucción
   cuando la dirección actual es impar.
-- Las pseudo-operaciones de datos se ubican consecutivamente, sin padding,
-  incluso cuando .FILL o .BLKW reservan Words.
+- Las pseudo-operaciones con ALIGN=True también se ubican en una dirección par;
+  si la dirección actual es impar, el ensamblador inserta un byte de padding.
+- Las pseudo-operaciones con ALIGN=False o ALIGN=None no agregan padding.
 =============================================================================
 '''
 
@@ -83,6 +84,7 @@ class BASE_PSEUDOOP:
     """
     MNEMONICS = []
     FORMATS = []
+    ALIGN = None
 
     def __init__(self, *args, **kwargs):
         pass
@@ -109,6 +111,7 @@ class PseudoOp_ORIG(BASE_PSEUDOOP):
     """Define la dirección de inicio en memoria del programa principal."""
     MNEMONICS = [".ORIG"]
     FORMATS = [[".ORIG", "ADDRESS"]]
+    ALIGN = True
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -121,6 +124,7 @@ class PseudoOp_END(BASE_PSEUDOOP):
     """Define el final del programa o módulo en el archivo actual."""
     MNEMONICS = [".END"]
     FORMATS = [[".END"]]
+    ALIGN = None
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -131,12 +135,11 @@ class PseudoOp_EXTERNAL(BASE_PSEUDOOP):
     """Declara una etiqueta perteneciente a otro archivo o módulo externo."""
     MNEMONICS = [".EXTERNAL"]
     FORMATS = [[".EXTERNAL", "EXT_SYMBOL"]]
+    ALIGN = None
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
-        # Recibe como argumento la direccion del symbolo externo, y lo devuelve como 2 numeros de 8 bits
-        address = int(arguments[1]) & 0xFFFF
-        return {"KIND": "EXTERNAL", "DATA": [(address >> 8) & 0xFF, address & 0xFF ]}
+        return {"KIND": "EXTERNAL", "DATA": []}
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +150,7 @@ class PseudoOp_FILL(BASE_PSEUDOOP):
     """Define e inicializa 1 Word (16 bits / 2 Bytes) en memoria."""
     MNEMONICS = [".FILL"]
     FORMATS = [[".FILL", "VALUE_16"]]
+    ALIGN = True
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -158,6 +162,7 @@ class PseudoOp_FILLB(BASE_PSEUDOOP):
     """Define e inicializa 1 Byte (8 bits) en memoria."""
     MNEMONICS = [".FILLB"]
     FORMATS = [[".FILLB", "VALUE_8"]]
+    ALIGN = False
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -169,6 +174,7 @@ class PseudoOp_BLKW(BASE_PSEUDOOP):
     """Reserva un bloque de Words en blanco (2 Bytes por Word)."""
     MNEMONICS = [".BLKW"]
     FORMATS = [[".BLKW", "COUNT"]]
+    ALIGN = True
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -182,6 +188,7 @@ class PseudoOp_BLKB(BASE_PSEUDOOP):
     """Reserva un bloque de Bytes en blanco (1 Byte por posición)."""
     MNEMONICS = [".BLKB"]
     FORMATS = [[".BLKB", "COUNT"]]
+    ALIGN = False
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -195,6 +202,7 @@ class PseudoOp_STRINGZ(BASE_PSEUDOOP):
     """Define una cadena de caracteres ASCII de 8 bits terminada en nulo ('\\0')."""
     MNEMONICS = [".STRINGZ"]
     FORMATS = [[".STRINGZ", "STRING"]]
+    ALIGN = True
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
