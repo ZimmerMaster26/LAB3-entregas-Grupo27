@@ -147,8 +147,16 @@ class BASE_INSTRUCTION():
 # 0: BR (BRNZP)
 class Instruction_BRNZP(BASE_INSTRUCTION):
     OPCODE = 0
-    MNEMONICS = ["BR", "BRN", "BRZ", "BRP", "BRNZ", "BRNP", "BRZP", "BRNZP"]
-    FORMATS = [["MNEMONIC", "PCOFFSET8"]]
+    MNEMONICS = ["BR", "BRN", "BRZ", "BRP", "BRNZ", "BRNP", "BRZP", "BRNZP", "NOP"]
+    FORMATS = [["BR", "PCOFFSET8"],
+               ["BRN", "PCOFFSET8"],
+               ["BRZ", "PCOFFSET8"],
+               ["BRP", "PCOFFSET8"],
+               ["BRNZ", "PCOFFSET8"],
+               ["BRNP", "PCOFFSET8"],
+               ["BRZP", "PCOFFSET8"],
+               ["BRNZP", "PCOFFSET8"],
+               ["NOP"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -175,6 +183,8 @@ class Instruction_BRNZP(BASE_INSTRUCTION):
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
         mnemonic = str(arguments[0]).upper()
+        if mnemonic == "NOP":
+            return cls((cls.OPCODE << 11) | (0b111 << 8))
         pcoffset8 = int(arguments[1]) & 0xFF
         cond = mnemonic[2:].lower()
         if not cond:
@@ -198,7 +208,9 @@ class Instruction_BRNZP(BASE_INSTRUCTION):
 class Instruction_BROC(BASE_INSTRUCTION):
     OPCODE = 1
     MNEMONICS = ["BRO", "BRC", "BROC"]
-    FORMATS = [["MNEMONIC", "PCOFFSET8"]]
+    FORMATS = [["BRO", "PCOFFSET8"],
+               ["BRC", "PCOFFSET8"],
+               ["BROC", "PCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -242,7 +254,7 @@ class Instruction_BROC(BASE_INSTRUCTION):
 class Instruction_ADD(BASE_INSTRUCTION):
     OPCODE = 2
     MNEMONICS = ["ADD"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"], ["MNEMONIC", "REG", "REG", "IMM4"]]
+    FORMATS = [["ADD", "REG", "REG", "REG"], ["ADD", "REG", "REG", "IMM4"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -287,7 +299,7 @@ class Instruction_ADD(BASE_INSTRUCTION):
 class Instruction_ADC(BASE_INSTRUCTION):
     OPCODE = 3
     MNEMONICS = ["ADC"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"], ["MNEMONIC", "REG", "REG", "IMM4"]]
+    FORMATS = [["ADC", "REG", "REG", "REG"], ["ADC", "REG", "REG", "IMM4"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -333,7 +345,7 @@ class Instruction_ADC(BASE_INSTRUCTION):
 class Instruction_LD(BASE_INSTRUCTION):
     OPCODE = 4
     MNEMONICS = ["LD"]
-    FORMATS = [["MNEMONIC", "REG", "PCOFFSET8"]]
+    FORMATS = [["LD", "REG", "PCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -373,7 +385,7 @@ class Instruction_LD(BASE_INSTRUCTION):
 class Instruction_LDB(BASE_INSTRUCTION):
     OPCODE = 5
     MNEMONICS = ["LDB"]
-    FORMATS = [["MNEMONIC", "REG", "BPCOFFSET8"]]
+    FORMATS = [["LDB", "REG", "BPCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -411,7 +423,7 @@ class Instruction_LDB(BASE_INSTRUCTION):
 class Instruction_ST(BASE_INSTRUCTION):
     OPCODE = 6
     MNEMONICS = ["ST"]
-    FORMATS = [["MNEMONIC", "REG", "PCOFFSET8"]]
+    FORMATS = [["ST", "REG", "PCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -446,7 +458,7 @@ class Instruction_ST(BASE_INSTRUCTION):
 class Instruction_STB(BASE_INSTRUCTION):
     OPCODE = 7
     MNEMONICS = ["STB"]
-    FORMATS = [["MNEMONIC", "REG", "BPCOFFSET8"]]
+    FORMATS = [["STB", "REG", "BPCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -480,7 +492,7 @@ class Instruction_STB(BASE_INSTRUCTION):
 class Instruction_JSR(BASE_INSTRUCTION):
     OPCODE = 8
     MNEMONICS = ["JSR", "JSRR"]
-    FORMATS = [["MNEMONIC", "PCOFFSET10"], ["MNEMONIC", "REG"]]
+    FORMATS = [["JSR", "PCOFFSET10"], ["JSRR", "REG"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -524,7 +536,7 @@ class Instruction_JSR(BASE_INSTRUCTION):
 class Instruction_AND(BASE_INSTRUCTION):
     OPCODE = 9
     MNEMONICS = ["AND"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"], ["MNEMONIC", "REG", "REG", "IMM4"]]
+    FORMATS = [["AND", "REG", "REG", "REG"], ["AND", "REG", "REG", "IMM4"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -562,7 +574,7 @@ class Instruction_AND(BASE_INSTRUCTION):
 class Instruction_LDR(BASE_INSTRUCTION):
     OPCODE = 10
     MNEMONICS = ["LDR"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "UOFFSET5"]]
+    FORMATS = [["LDR", "REG", "REG", "UOFFSET5"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -604,7 +616,7 @@ class Instruction_LDR(BASE_INSTRUCTION):
 class Instruction_LDRB(BASE_INSTRUCTION):
     OPCODE = 11
     MNEMONICS = ["LDRB"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "BUOFFSET5"]]
+    FORMATS = [["LDRB", "REG", "REG", "BUOFFSET5"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -644,7 +656,7 @@ class Instruction_LDRB(BASE_INSTRUCTION):
 class Instruction_STR(BASE_INSTRUCTION):
     OPCODE = 12
     MNEMONICS = ["STR"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "UOFFSET5"]]
+    FORMATS = [["STR", "REG", "REG", "UOFFSET5"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -681,7 +693,7 @@ class Instruction_STR(BASE_INSTRUCTION):
 class Instruction_STRB(BASE_INSTRUCTION):
     OPCODE = 13
     MNEMONICS = ["STRB"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "BUOFFSET5"]]
+    FORMATS = [["STRB", "REG", "REG", "BUOFFSET5"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -717,7 +729,7 @@ class Instruction_STRB(BASE_INSTRUCTION):
 class Instruction_XOR(BASE_INSTRUCTION):
     OPCODE = 14
     MNEMONICS = ["XOR", "NOT"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"], ["MNEMONIC", "REG", "REG", "IMM4"], ["MNEMONIC", "REG", "REG"]]
+    FORMATS = [["XOR", "REG", "REG", "REG"], ["XOR", "REG", "REG", "IMM4"], ["NOT", "REG", "REG"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -769,7 +781,7 @@ class Instruction_XOR(BASE_INSTRUCTION):
 class Instruction_LEA(BASE_INSTRUCTION):
     OPCODE = 15
     MNEMONICS = ["LEA"]
-    FORMATS = [["MNEMONIC", "REG", "PCOFFSET8"]]
+    FORMATS = [["LEA", "REG", "PCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -799,7 +811,7 @@ class Instruction_LEA(BASE_INSTRUCTION):
 class Instruction_RTI(BASE_INSTRUCTION):
     OPCODE = 16
     MNEMONICS = ["RTI"]
-    FORMATS = [["MNEMONIC"]]
+    FORMATS = [["RTI"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -821,7 +833,7 @@ class Instruction_RTI(BASE_INSTRUCTION):
 class Instruction_SEXT(BASE_INSTRUCTION):
     OPCODE = 17
     MNEMONICS = ["SEXT", "BEXT"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"], ["MNEMONIC", "REG", "REG", "CPSH4"], ["MNEMONIC", "REG", "REG"]]
+    FORMATS = [["SEXT", "REG", "REG", "REG"], ["SEXT", "REG", "REG", "UNSH4"], ["BEXT", "REG", "REG"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -875,7 +887,7 @@ class Instruction_SEXT(BASE_INSTRUCTION):
 class Instruction_LDI(BASE_INSTRUCTION):
     OPCODE = 18
     MNEMONICS = ["LDI"]
-    FORMATS = [["MNEMONIC", "REG", "PCOFFSET8"]]
+    FORMATS = [["LDI", "REG", "PCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -919,7 +931,7 @@ class Instruction_LDI(BASE_INSTRUCTION):
 class Instruction_LDIB(BASE_INSTRUCTION):
     OPCODE = 19
     MNEMONICS = ["LDIB"]
-    FORMATS = [["MNEMONIC", "REG", "BPCOFFSET8"]]
+    FORMATS = [["LDIB", "REG", "BPCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -961,7 +973,7 @@ class Instruction_LDIB(BASE_INSTRUCTION):
 class Instruction_STI(BASE_INSTRUCTION):
     OPCODE = 20
     MNEMONICS = ["STI"]
-    FORMATS = [["MNEMONIC", "REG", "PCOFFSET8"]]
+    FORMATS = [["STI", "REG", "PCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1000,7 +1012,7 @@ class Instruction_STI(BASE_INSTRUCTION):
 class Instruction_STIB(BASE_INSTRUCTION):
     OPCODE = 21
     MNEMONICS = ["STIB"]
-    FORMATS = [["MNEMONIC", "REG", "BPCOFFSET8"]]
+    FORMATS = [["STIB", "REG", "BPCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1038,7 +1050,7 @@ class Instruction_STIB(BASE_INSTRUCTION):
 class Instruction_JMP(BASE_INSTRUCTION):
     OPCODE = 22
     MNEMONICS = ["JMP", "RET"]
-    FORMATS = [["MNEMONIC", "REG"], ["MNEMONIC"]]
+    FORMATS = [["JMP", "REG"], ["RET"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1074,7 +1086,7 @@ class Instruction_JMP(BASE_INSTRUCTION):
 class Instruction_SHF(BASE_INSTRUCTION):
     OPCODE = 23
     MNEMONICS = ["SHF", "LSH", "RSH"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "NSH5"], ["MNEMONIC", "REG", "REG", "UNSH4"], ["MNEMONIC", "REG", "REG", "CPSH4"]]
+    FORMATS = [["SHF", "REG", "REG", "NSH5"], ["LSH", "REG", "REG", "UNSH4"], ["RSH", "REG", "REG", "CPSH4"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1124,7 +1136,7 @@ class Instruction_SHF(BASE_INSTRUCTION):
         if format_idx == 1 or str(arguments[0]).upper() == "LSH":
             nsh5 = shift_val & 0xF
         elif format_idx == 2 or str(arguments[0]).upper() == "RSH":
-            nsh5 = (1 << 4) | (shift_val & 0xF)
+            nsh5 = (-shift_val) & 0x1F
         else:
             nsh5 = shift_val & 0x1F
         val = (cls.OPCODE << 11) | ((dr & 7) << 8) | ((sr & 7) << 5) | nsh5
@@ -1140,7 +1152,7 @@ class Instruction_SHF(BASE_INSTRUCTION):
 class Instruction_SHFO(BASE_INSTRUCTION):
     OPCODE = 24
     MNEMONICS = ["SHFO", "LSHO", "RSHO"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "NSH5"], ["MNEMONIC", "REG", "REG", "UNSH4"], ["MNEMONIC", "REG", "REG", "CPSH4"]]
+    FORMATS = [["SHFO", "REG", "REG", "NSH5"], ["LSHO", "REG", "REG", "UNSH4"], ["RSHO", "REG", "REG", "CPSH4"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1190,7 +1202,7 @@ class Instruction_SHFO(BASE_INSTRUCTION):
         if format_idx == 1 or str(arguments[0]).upper() == "LSHO":
             nsh5 = shift_val & 0xF
         elif format_idx == 2 or str(arguments[0]).upper() == "RSHO":
-            nsh5 = (1 << 4) | (shift_val & 0xF)
+            nsh5 = (-shift_val) & 0x1F
         else:
             nsh5 = shift_val & 0x1F
         val = (cls.OPCODE << 11) | ((dr & 7) << 8) | ((sr & 7) << 5) | nsh5
@@ -1206,7 +1218,7 @@ class Instruction_SHFO(BASE_INSTRUCTION):
 class Instruction_SHR(BASE_INSTRUCTION):
     OPCODE = 25
     MNEMONICS = ["SHR", "SHRO"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"]]
+    FORMATS = [["SHR", "REG", "REG", "REG"], ["SHRO", "REG", "REG", "REG"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1267,7 +1279,7 @@ class Instruction_SHR(BASE_INSTRUCTION):
 class Instruction_OR(BASE_INSTRUCTION):
     OPCODE = 26
     MNEMONICS = ["OR"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"], ["MNEMONIC", "REG", "REG", "IMM4"]]
+    FORMATS = [["OR", "REG", "REG", "REG"], ["OR", "REG", "REG", "IMM4"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1305,7 +1317,7 @@ class Instruction_OR(BASE_INSTRUCTION):
 class Instruction_MUL(BASE_INSTRUCTION):
     OPCODE = 27
     MNEMONICS = ["MUL"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"], ["MNEMONIC", "REG", "REG", "IMM4"]]
+    FORMATS = [["MUL", "REG", "REG", "REG"], ["MUL", "REG", "REG", "IMM4"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1349,7 +1361,7 @@ class Instruction_MUL(BASE_INSTRUCTION):
 class Instruction_MULH(BASE_INSTRUCTION):
     OPCODE = 28
     MNEMONICS = ["MULH"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"], ["MNEMONIC", "REG", "REG", "IMM4"]]
+    FORMATS = [["MULH", "REG", "REG", "REG"], ["MULH", "REG", "REG", "IMM4"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1389,7 +1401,7 @@ class Instruction_MULH(BASE_INSTRUCTION):
 class Instruction_DIV(BASE_INSTRUCTION):
     OPCODE = 29
     MNEMONICS = ["DIV"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"], ["MNEMONIC", "REG", "REG", "IMM4"]]
+    FORMATS = [["DIV", "REG", "REG", "REG"], ["DIV", "REG", "REG", "IMM4"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1437,7 +1449,7 @@ class Instruction_DIV(BASE_INSTRUCTION):
 class Instruction_MOD(BASE_INSTRUCTION):
     OPCODE = 30
     MNEMONICS = ["MOD"]
-    FORMATS = [["MNEMONIC", "REG", "REG", "REG"], ["MNEMONIC", "REG", "REG", "IMM4"]]
+    FORMATS = [["MOD", "REG", "REG", "REG"], ["MOD", "REG", "REG", "IMM4"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
@@ -1487,7 +1499,7 @@ class Instruction_MOD(BASE_INSTRUCTION):
 class Instruction_TRAP(BASE_INSTRUCTION):
     OPCODE = 31
     MNEMONICS = ["TRAP", "GETC", "OUT", "PUTS", "IN", "PUTSW", "HALT"]
-    FORMATS = [["MNEMONIC", "TRAPVEC8"], ["MNEMONIC"]]
+    FORMATS = [["TRAP", "TRAPVEC8"], ["GETC"], ["OUT"], ["PUTS"], ["IN"], ["PUTSW"], ["HALT"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)

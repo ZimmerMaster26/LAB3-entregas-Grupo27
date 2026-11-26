@@ -35,4 +35,16 @@
 
 ### Lunes 23, Nov 2026
 
+- Puede que esta semana trabajemos menos (Semana de exámenes difíciles).
 - Testeo del ensamblador.
+
+### Martes 24, Nov 2026
+
+- Nombre de la nueva isa: ISA-G27.
+- Comienzo del pasaje del benchmark dato de la LC-3 a ISA-G27.
+
+### Jueves 26, Nov 2026
+
+- Pasaje completo del benchmark.
+- Ensamblador e instrucciones corregido.
+- Generación del código del simulador.

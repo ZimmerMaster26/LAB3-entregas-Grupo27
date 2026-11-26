@@ -111,86 +111,157 @@ def parse_register(token: str) -> int:
     raise ValueError(f"Registro inválido: '{token}'. Se esperaba R0..R7.")
 
 
-def is_number(token: str) -> bool:
-    """Determina si un token puede ser interpretado como un valor numérico."""
+_OPERAND_SPECS = {
+    "IMM4":       {"kind": "int", "bits": 4,  "signed": True},
+    "NSH5":       {"kind": "int", "bits": 5,  "signed": True},
+    "UNSH4":      {"kind": "int", "bits": 4,  "signed": False},
+    "CPSH4":      {"kind": "int", "min": 1,   "max": 16},
+    "UOFFSET5":   {"kind": "int", "bits": 5,  "signed": False},
+    "BUOFFSET5":  {"kind": "int", "bits": 5,  "signed": False},
+    "TRAPVEC8":   {"kind": "int", "bits": 8,  "signed": False},
+    "PCOFFSET8":  {"kind": "pcoffset", "bits": 8,  "signed": True, "is_byte": False},
+    "PCOFFSET10": {"kind": "pcoffset", "bits": 10, "signed": True, "is_byte": False},
+    "BPCOFFSET8": {"kind": "pcoffset", "bits": 8,  "signed": True, "is_byte": True},
+    "ADDRESS":    {"kind": "int", "bits": 16, "signed": False},
+    "VALUE_16":   {"kind": "int", "bits": 16, "signed": True, "allow_unsigned_symbol": True},
+    "VALUE_8":    {"kind": "int", "bits": 8,  "signed": True, "allow_unsigned_symbol": True},
+    "VALUE":      {"kind": "int", "bits": 16, "signed": True, "allow_unsigned_symbol": True},
+    "COUNT":      {"kind": "int", "min": 0,   "max": 0xFFFF},
+}
+
+
+def parse_number_info(token) -> tuple:
+    """
+    Parsea un token numérico a (valor_entero, es_literal_de_bits).
+
+    - Decimales (#123, #-45, 123, -45) y literales de carácter ('A') permiten signo
+      y devuelven es_literal_de_bits=False.
+    - Hexadecimales (xFFFF, 0xFF) y binarios (b1010, 0b1010) NO aceptan signo '-' ni '+'
+      y devuelven es_literal_de_bits=True.
+    """
+    if isinstance(token, int) and not isinstance(token, bool):
+        return token, False
     if not isinstance(token, str):
-        return isinstance(token, int)
+        raise ValueError(f"Literal numérico inválido: '{token}'")
+
     t = token.strip()
     if not t:
-        return False
+        raise ValueError("Literal numérico vacío")
 
-    # Decimal con prefijo #: #123, #-123
+    # Decimal con prefijo #: #123, #-123, #+123
     if t.startswith('#'):
-        try:
-            int(t[1:], 10)
-            return True
-        except ValueError:
-            return False
+        if re.match(r'^#[+-]?[0-9]+$', t):
+            return int(t[1:], 10), False
+        raise ValueError(f"Literal decimal inválido: '{token}'")
 
-    # Hexadecimal con prefijo x/X: x3000, xFFA0, x-10, -x10
-    if re.match(r'^[+-]?[xX][0-9a-fA-F]+$', t) or re.match(r'^[xX][+-][0-9a-fA-F]+$', t):
-        return True
+    # Hexadecimal sin signo: x..., X..., 0x..., 0X...
+    if re.match(r'^(?:0[xX]|[xX])[0-9a-fA-F]+$', t):
+        hex_part = t[2:] if t.lower().startswith('0x') else t[1:]
+        return int(hex_part, 16), True
 
-    # Hexadecimal con prefijo 0x/0X
-    if re.match(r'^[+-]?0[xX][0-9a-fA-F]+$', t):
-        return True
-
-    # Binario con prefijo b/B o 0b/0B
-    if re.match(r'^[+-]?[bB][01]+$', t) or re.match(r'^[+-]?0[bB][01]+$', t):
-        return True
+    # Binario sin signo: b..., B..., 0b..., 0B...
+    if re.match(r'^(?:0[bB]|[bB])[01]+$', t):
+        bin_part = t[2:] if t.lower().startswith('0b') else t[1:]
+        return int(bin_part, 2), True
 
     # Carácter entre comillas simples: 'c', '\n'
     if len(t) >= 3 and t.startswith("'") and t.endswith("'"):
-        return True
+        inner = unescape_string(t[1:-1])
+        if len(inner) == 1:
+            return ord(inner), False
+        raise ValueError(f"Literal de carácter inválido: '{token}'")
 
-    # Decimal simple sin prefijo
+    # Decimal simple sin prefijo (acepta signo)
+    if re.match(r'^[+-]?[0-9]+$', t):
+        return int(t, 10), False
+
+    raise ValueError(f"Literal numérico inválido: '{token}'")
+
+
+def is_number(token) -> bool:
+    """Determina si un token puede ser interpretado como un valor numérico válido."""
     try:
-        int(t, 10)
+        parse_number_info(token)
         return True
     except ValueError:
         return False
 
 
-def parse_number(token: str) -> int:
+def parse_number(token) -> int:
     """Parsea un token numérico en decimal, hexadecimal, binario o carácter literal a entero."""
-    if isinstance(token, int):
-        return token
-    t = token.strip()
+    value, _ = parse_number_info(token)
+    return value
 
-    # Prefijo decimal #: #123, #-45
-    if t.startswith('#'):
-        return int(t[1:], 10)
 
-    # Carácter entre comillas simples: 'A', '\n'
-    if len(t) >= 3 and t.startswith("'") and t.endswith("'"):
-        inner = unescape_string(t[1:-1])
-        if len(inner) == 1:
-            return ord(inner)
-        raise ValueError(f"Literal de carácter inválido: '{token}'")
+def _validate_numeric_operand(operand_type: str, value: int, is_bit_literal: bool = False,
+                              resolved_symbol: bool = False) -> int:
+    """Valida que un operando numérico esté dentro del rango exacto permitido por su tipo."""
+    spec = _OPERAND_SPECS.get(operand_type)
+    if spec is None:
+        raise ValueError(f"Tipo de operando no soportado: '{operand_type}'")
 
-    # Hexadecimal: x... o X...
-    if t.upper().startswith('X'):
-        hex_part = t[1:]
-        if hex_part.startswith('-'):
-            return -int(hex_part[1:], 16)
-        return int(hex_part, 16)
-    if t.startswith('-X') or t.startswith('-x'):
-        return -int(t[2:], 16)
-    if t.startswith('+X') or t.startswith('+x'):
-        return int(t[2:], 16)
+    if "min" in spec and "max" in spec:
+        min_val, max_val = spec["min"], spec["max"]
+    else:
+        bits = spec["bits"]
+        if resolved_symbol and spec.get("allow_unsigned_symbol"):
+            min_val, max_val = 0, (1 << bits) - 1
+        elif is_bit_literal or not spec.get("signed", False):
+            min_val, max_val = 0, (1 << bits) - 1
+        else:
+            min_val = -(1 << (bits - 1))
+            max_val = (1 << (bits - 1)) - 1
 
-    # 0x...
-    if t.lower().startswith('0x') or t.lower().startswith('-0x') or t.lower().startswith('+0x'):
-        return int(t, 16)
+    if not (min_val <= value <= max_val):
+        raise ValueError(
+            f"Valor fuera de rango para {operand_type}: {value} "
+            f"(rango permitido: [{min_val}, {max_val}])"
+        )
+    return value
 
-    # Binario: b... o B... o 0b...
-    if t.upper().startswith('B'):
-        return int(t[1:], 2)
-    if t.lower().startswith('0b') or t.lower().startswith('-0b') or t.lower().startswith('+0b'):
-        return int(t, 2)
 
-    # Decimal plano
-    return int(t, 10)
+def _split_tokens(text: str, line_num: int = 0) -> list:
+    """
+    Divide una línea en tokens usando comas y espacios como delimitadores,
+    preservando intactas las cadenas entre comillas dobles y literales entre comillas simples.
+    """
+    tokens = []
+    current = []
+    in_quote = False
+    quote_char = ''
+    i = 0
+    n = len(text)
+
+    while i < n:
+        c = text[i]
+        if in_quote:
+            current.append(c)
+            if c == '\\':
+                if i + 1 < n:
+                    i += 1
+                    current.append(text[i])
+                else:
+                    raise ValueError(f"Secuencia de escape incompleta en línea {line_num}")
+            elif c == quote_char:
+                in_quote = False
+        else:
+            if c in ('"', "'"):
+                in_quote = True
+                quote_char = c
+                current.append(c)
+            elif c == ',' or c.isspace():
+                if current:
+                    tokens.append(''.join(current))
+                    current.clear()
+            else:
+                current.append(c)
+        i += 1
+
+    if in_quote:
+        raise ValueError(f"Literal entre comillas sin cerrar en línea {line_num}")
+    if current:
+        tokens.append(''.join(current))
+    return tokens
 
 
 def _instruction_classes():
@@ -349,7 +420,7 @@ class ParsedLine:
         self.pseudoop_result = None
 
         if self.mnemonic:
-            if _instruction_class_for(self.mnemonic) is not None or self.mnemonic == "NOP":
+            if _instruction_class_for(self.mnemonic) is not None:
                 self.is_instruction = True
             elif _pseudoop_class_for(self.mnemonic) is not None:
                 self.is_pseudoop = True
@@ -362,6 +433,8 @@ class ModuleAST:
         self.lines = lines or []
         self.file_path = file_path
         self.symbols = {}
+        self.symbol_names = {}
+        self.external_imports = {}
         self.start_address = 0
         self.end_address = 0
         self.external_dependencies = []
@@ -452,8 +525,25 @@ class Assembler:
         # Determinar el tipo de origen (archivo, diccionario o texto directo)
         if isinstance(source, dict):
             f_map = dict(source)
-            main_code = f_map.get(main_file) or next(iter(f_map.values()))
-            main_name = main_file
+            if not f_map:
+                raise ValueError("El diccionario de archivos fuente está vacío")
+            norm_target = self._normalize_mod_name(main_file)
+            matched_key = None
+            for k in f_map:
+                if self._normalize_mod_name(k) == norm_target:
+                    matched_key = k
+                    break
+            if matched_key is not None:
+                main_code = f_map[matched_key]
+                main_name = self._normalize_mod_name(matched_key)
+            elif main_file == "main":
+                first_key, first_val = next(iter(f_map.items()))
+                main_code = first_val
+                main_name = self._normalize_mod_name(first_key)
+            else:
+                raise FileNotFoundError(
+                    f"No se pudo encontrar el archivo principal '{main_file}' en el diccionario"
+                )
             base_dir = os.getcwd()
         elif isinstance(source, (str, Path)) and os.path.isfile(str(source)):
             input_file_path = Path(source).resolve()
@@ -464,9 +554,19 @@ class Assembler:
                 main_code = f.read()
             f_map = dict(file_map or {})
         elif isinstance(source, (str, Path)) and not str(source).count('\n') and Path(str(source)).suffix.lower() == '.asm':
-            # Se pasó una ruta de archivo que no existe directamente
-            input_file_path = Path(source)
-            raise FileNotFoundError(f"No se pudo encontrar el archivo fuente especificado: {source}")
+            # Buscar sin sensibilidad a mayúsculas/minúsculas en el directorio padre
+            cand_path = Path(source)
+            found_ci = self._find_file_case_insensitive(cand_path)
+            if found_ci is not None:
+                input_file_path = found_ci.resolve()
+                source_is_file = True
+                base_dir = str(input_file_path.parent)
+                main_name = input_file_path.stem
+                with open(input_file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    main_code = f.read()
+                f_map = dict(file_map or {})
+            else:
+                raise FileNotFoundError(f"No se pudo encontrar el archivo fuente especificado: {source}")
         else:
             # Cadena de texto directa
             main_code = str(source)
@@ -492,12 +592,13 @@ class Assembler:
 
         # Primera pasada: asignación de memoria y tabla de símbolos
         symbol_table, orig_address = self._pass_1(modules_ast)
+        modules_by_norm = {self._normalize_mod_name(m.name): m for m in modules_ast}
 
         # Resolver .EXTERNAL cuando ya existen las direcciones de todos los módulos.
-        self._assemble_external_pseudoops(modules_ast, symbol_table)
+        self._assemble_external_pseudoops(modules_ast, modules_by_norm)
 
         # Segunda pasada: generación de instrucciones y bytes
-        emitted_bytes = self._pass_2(modules_ast, symbol_table, orig_address)
+        emitted_bytes = self._pass_2(modules_ast, modules_by_norm, orig_address)
 
         # Preparar bytes finales con o sin dirección de origen
         if inc_orig:
@@ -550,37 +651,116 @@ class Assembler:
                 return str(p)
         return None
 
+    def _find_file_case_insensitive(self, path: Path):
+        """Busca un archivo por nombre insensible a mayúsculas/minúsculas en su carpeta."""
+        parent = path.parent if str(path.parent) else Path(".")
+        if not parent.is_dir():
+            return None
+        target_lower = path.name.lower()
+        for entry in parent.iterdir():
+            if entry.is_file() and entry.name.lower() == target_lower:
+                return entry
+        return None
+
+    def _is_known_mnemonic(self, token: str) -> bool:
+        upper = token.upper()
+        return (
+            upper in _known_instruction_mnemonics()
+            or upper in _known_pseudoop_mnemonics()
+        )
+
+    def _is_external_pseudoop(self, pline: ParsedLine) -> bool:
+        if not pline.is_pseudoop or not pline.mnemonic:
+            return False
+        pseudoop_cls = _pseudoop_class_for(pline.mnemonic)
+        if pseudoop_cls is None:
+            return False
+        return any(
+            str(field).upper() == "EXT_SYMBOL"
+            for fmt in getattr(pseudoop_cls, "FORMATS", ())
+            for field in fmt
+        )
+
+    def _split_external_ref(self, ref: str, line_num: int) -> tuple:
+        """Separa una referencia externa 'archivo-etiqueta' validando ambas partes."""
+        text = str(ref).strip()
+        if '-' not in text:
+            raise ValueError(
+                f"Referencia .EXTERNAL inválida '{ref}' (línea {line_num}): "
+                "se esperaba el formato 'nombre_de_archivo-etiqueta'"
+            )
+        dep_file, dep_label = text.split('-', 1)
+        dep_file = dep_file.strip()
+        dep_label = dep_label.strip()
+        if not dep_file or not dep_label:
+            raise ValueError(
+                f"Referencia .EXTERNAL inválida '{ref}' (línea {line_num}): "
+                "se esperaba el formato 'nombre_de_archivo-etiqueta'"
+            )
+        return dep_file, dep_label
+
     def _tokenize_line(self, line_num: int, raw_line: str) -> ParsedLine:
         """Divide una línea de código fuente en etiqueta, mnemónico y operandos."""
         cleaned = strip_comments(raw_line)
         if not cleaned:
             return ParsedLine(line_num, raw_line)
 
-        # Caso especial para pseudo-operación .STRINGZ (conserva espacios y comas dentro de comillas)
-        stringz_match = re.search(r'(?i)\.STRINGZ\s*("(?:\\.|[^"\\])*")', cleaned)
-        if stringz_match:
-            before_str = cleaned[:stringz_match.start()].strip()
-            str_content = stringz_match.group(1)[1:-1] # Quitar las comillas exteriores
-            tokens_before = [t for t in re.split(r'[,\s]+', before_str) if t] if before_str else []
-            label = tokens_before[0].rstrip(':') if tokens_before else None
-            return ParsedLine(line_num, raw_line, label=label, mnemonic=".STRINGZ", operands=[str_content])
-
-        # Tokenización estándar separando por comas y espacios en blanco
-        tokens = [t for t in re.split(r'[,\s]+', cleaned) if t]
+        tokens = _split_tokens(cleaned, line_num=line_num)
         if not tokens:
             return ParsedLine(line_num, raw_line)
 
-        first = tokens[0].upper()
-        # Verificar si el primer token es una instrucción o pseudo-operación
-        if first in _known_instruction_mnemonics() or first in _known_pseudoop_mnemonics() or first == "NOP":
-            return ParsedLine(line_num, raw_line, label=None, mnemonic=tokens[0], operands=tokens[1:])
+        # Verificar uso inválido de ':' (espacio antes de ':', ':' suelto o ':' en operandos)
+        if tokens[0].startswith(':'):
+            raise ValueError(
+                f"Sintaxis de etiqueta inválida (':' sin etiqueta) en la línea {line_num}"
+            )
+        if len(tokens) >= 2 and tokens[1].startswith(':'):
+            raise ValueError(
+                f"Espacio inválido entre la etiqueta '{tokens[0]}' y ':' en la línea {line_num}"
+            )
+        for tok in tokens[1:]:
+            if not (tok.startswith('"') or tok.startswith("'")) and ':' in tok:
+                raise ValueError(
+                    f"Uso inesperado de ':' en '{tok}' en la línea {line_num}"
+                )
 
-        # Si el primer token no es mnemónico, actúa como etiqueta
-        label = tokens[0].rstrip(':')
-        if len(tokens) == 1:
-            return ParsedLine(line_num, raw_line, label=label, mnemonic=None, operands=[])
+        first_tok = tokens[0]
+        is_quoted_first = first_tok.startswith('"') or first_tok.startswith("'")
 
-        return ParsedLine(line_num, raw_line, label=label, mnemonic=tokens[1], operands=tokens[2:])
+        if not is_quoted_first and ':' in first_tok:
+            lbl_part, rest = first_tok.split(':', 1)
+            if not lbl_part or ':' in rest:
+                raise ValueError(
+                    f"Sintaxis de etiqueta inválida '{first_tok}' en la línea {line_num}"
+                )
+            label = lbl_part
+            rem = ([rest] + tokens[1:]) if rest else tokens[1:]
+            if not rem:
+                return ParsedLine(line_num, raw_line, label=label, mnemonic=None, operands=[])
+            mnemonic_tok = rem[0]
+            operands = rem[1:]
+        elif not is_quoted_first and self._is_known_mnemonic(first_tok):
+            return ParsedLine(
+                line_num, raw_line, label=None, mnemonic=first_tok, operands=tokens[1:]
+            )
+        else:
+            if is_quoted_first:
+                raise ValueError(
+                    f"Token inicial inválido '{first_tok}' en la línea {line_num}"
+                )
+            label = first_tok
+            if len(tokens) == 1:
+                return ParsedLine(line_num, raw_line, label=label, mnemonic=None, operands=[])
+            mnemonic_tok = tokens[1]
+            operands = tokens[2:]
+
+        if not self._is_known_mnemonic(mnemonic_tok):
+            raise ValueError(
+                f"Instrucción o directiva desconocida '{mnemonic_tok}' en la línea {line_num}"
+            )
+        return ParsedLine(
+            line_num, raw_line, label=label, mnemonic=mnemonic_tok, operands=operands
+        )
 
     def _assemble_pseudoop(self, pline: ParsedLine, resolver=None,
                             allow_unresolved=False, operands=None) -> dict:
@@ -596,6 +776,7 @@ class Assembler:
             )
 
         operands = list(pline.operands if operands is None else operands)
+        defaulted_empty_string = False
         if not operands:
             for pseudo_format in formats:
                 operand_types = [str(field).upper() for field in pseudo_format
@@ -604,7 +785,8 @@ class Assembler:
                     operands = ["1"]
                     break
                 if operand_types == ["STRING"]:
-                    operands = [""]
+                    operands = ['""']
+                    defaulted_empty_string = True
                     break
 
         conversion_errors = []
@@ -621,21 +803,34 @@ class Assembler:
                 arguments = [pline.mnemonic]
                 for operand_type, operand in zip(operand_types, operands):
                     if operand_type == "STRING":
-                        value = unescape_string(operand)
+                        if isinstance(operand, str) and len(operand) >= 2 and operand.startswith('"') and operand.endswith('"'):
+                            value = unescape_string(operand[1:-1])
+                        elif defaulted_empty_string:
+                            value = ""
+                        else:
+                            raise ValueError(
+                                f"se esperaba una cadena entre comillas dobles: '{operand}'"
+                            )
                     elif operand_type == "EXT_SYMBOL":
                         value = operand
                     elif operand_type in (
                         "ADDRESS", "COUNT", "VALUE", "VALUE_8", "VALUE_16"
                     ):
                         if is_number(operand):
-                            value = parse_number(operand)
+                            num_val, is_bit_lit = parse_number_info(operand)
+                            value = _validate_numeric_operand(
+                                operand_type, num_val, is_bit_literal=is_bit_lit
+                            )
                         elif resolver is not None and operand_type.startswith("VALUE"):
-                            value = resolver(operand)
+                            sym_addr = resolver(operand)
+                            value = _validate_numeric_operand(
+                                operand_type, sym_addr, resolved_symbol=True
+                            )
                         elif allow_unresolved and operand_type.startswith("VALUE"):
                             value = 0
                         else:
                             raise ValueError(
-                                f"se esperaba un valor numérico para {operand_type}: '{operand}'"
+                                f"se esperaba un valor numérico válido para {operand_type}: '{operand}'"
                             )
                     else:
                         value = operand
@@ -690,6 +885,7 @@ class Assembler:
                           file_map: dict, search_dirs: list) -> list:
         """Carga y analiza el módulo principal y resuelve todas sus dependencias .EXTERNAL."""
         loaded_modules = {}
+        queued_norms = {self._normalize_mod_name(main_name)}
         queue = [(main_name, main_code, main_file_path)]
         modules_ast = []
 
@@ -701,17 +897,24 @@ class Assembler:
 
             parsed_lines = []
             external_deps = []
+            external_imports = {}
 
             for line_idx, raw_line in enumerate(code.splitlines(), start=1):
                 pline = self._tokenize_line(line_idx, raw_line)
                 parsed_lines.append(pline)
 
                 if pline.is_pseudoop:
-                    if pline.mnemonic == ".EXTERNAL":
+                    if self._is_external_pseudoop(pline):
+                        if not pline.operands:
+                            raise ValueError(
+                                f"La directiva '{pline.mnemonic}' requiere al menos una referencia "
+                                f"(línea {pline.line_num})"
+                            )
                         for op in pline.operands:
-                            # La sintaxis es nombre_de_archivo-etiqueta o nombre_de_archivo.
-                            dep_file = str(op).split('-', 1)[0].strip()
-                            if dep_file and dep_file not in external_deps:
+                            dep_file, dep_label = self._split_external_ref(op, pline.line_num)
+                            norm_dep = self._normalize_mod_name(dep_file)
+                            external_imports[(norm_dep, dep_label.lower())] = f"{dep_file}-{dep_label}"
+                            if norm_dep not in {self._normalize_mod_name(d) for d in external_deps}:
                                 external_deps.append(dep_file)
                         continue
 
@@ -725,63 +928,50 @@ class Assembler:
 
             mod_ast = ModuleAST(name=mod_name, lines=parsed_lines, file_path=f_path)
             mod_ast.external_dependencies = external_deps
+            mod_ast.external_imports = external_imports
             loaded_modules[norm_name] = mod_ast
             modules_ast.append(mod_ast)
 
             # Cargar dependencias externas requeridas
             for dep in external_deps:
                 norm_dep = self._normalize_mod_name(dep)
-                if norm_dep not in loaded_modules:
+                if norm_dep not in loaded_modules and norm_dep not in queued_norms:
                     dep_code, dep_path = self._resolve_external_file(dep, file_map, search_dirs)
+                    queued_norms.add(norm_dep)
                     queue.append((dep, dep_code, dep_path))
 
         return modules_ast
 
     def _normalize_mod_name(self, name: str) -> str:
-        """Normaliza el nombre del módulo para búsquedas insensibles a mayúsculas y prefijos."""
+        """Normaliza el nombre del módulo para búsquedas insensibles a mayúsculas/minúsculas."""
         s = name.strip().lower()
         if s.endswith(".asm"):
             s = s[:-4]
-        if s.startswith("g27_"):
-            s = s[4:]
         return s
 
     def _resolve_external_file(self, mod_name: str, file_map: dict, search_dirs: list):
         """Busca el contenido de un módulo externo en el mapa de archivos o en el disco."""
         norm = self._normalize_mod_name(mod_name)
 
-        # 1. Buscar en file_map
+        # 1. Buscar en file_map (insensible a mayúsculas/minúsculas y extensión .asm)
         for k, v in file_map.items():
             if self._normalize_mod_name(k) == norm:
                 return v, None
 
-        # 2. Buscar en directorios de disco
-        candidates = [
-            f"{mod_name}.asm",
-            f"{mod_name.lower()}.asm",
-            f"{mod_name.upper()}.asm",
-        ]
-        if mod_name.lower().startswith("g27_"):
-            stripped = mod_name[4:]
-            candidates.extend([f"{stripped}.asm", f"{stripped.lower()}.asm", f"{stripped.upper()}.asm"])
-        else:
-            candidates.extend([f"g27_{mod_name}.asm", f"g27_{mod_name.lower()}.asm"])
-
+        # 2. Buscar en directorios de disco (insensible a mayúsculas/minúsculas)
+        target_lower = f"{norm}.asm"
         for sdir in search_dirs:
             if not sdir or not os.path.exists(sdir):
                 continue
-            # Búsqueda en el directorio raíz indicado y subdirectorios
             for root, _, files in os.walk(sdir):
                 files_lower = {f.lower(): f for f in files}
-                for cand in candidates:
-                    cand_lower = cand.lower()
-                    if cand_lower in files_lower:
-                        full_path = os.path.join(root, files_lower[cand_lower])
-                        try:
-                            with open(full_path, 'r', encoding='utf-8', errors='replace') as f:
-                                return f.read(), full_path
-                        except OSError as e:
-                            raise OSError(f"Error al leer el archivo externo '{full_path}': {e}")
+                if target_lower in files_lower:
+                    full_path = os.path.join(root, files_lower[target_lower])
+                    try:
+                        with open(full_path, 'r', encoding='utf-8', errors='replace') as f:
+                            return f.read(), full_path
+                    except OSError as e:
+                        raise OSError(f"Error al leer el archivo externo '{full_path}': {e}")
 
         raise FileNotFoundError(
             f"No se pudo encontrar el archivo fuente para el módulo externo '{mod_name}'. "
@@ -809,13 +999,13 @@ class Assembler:
 
             for pline in mod.lines:
                 if pline.label:
-                    pending_labels.append(pline.label)
+                    pending_labels.append((pline.label, pline.line_num))
 
                 if pline.mnemonic is None:
                     # Línea que solo contiene etiqueta
                     continue
 
-                if pline.mnemonic == ".EXTERNAL":
+                if self._is_external_pseudoop(pline):
                     continue
 
                 if pline.is_instruction:
@@ -839,9 +1029,9 @@ class Assembler:
                             orig_data = result["DATA"]
                             orig_address = (orig_data[0] << 8) | orig_data[1]
                             current_pc = orig_address
-                            for lbl in pending_labels:
+                            for lbl, lbl_line in pending_labels:
                                 self._register_symbol(
-                                    symbol_table, mod, lbl, current_pc
+                                    symbol_table, mod, lbl, current_pc, lbl_line
                                 )
                             pending_labels.clear()
                         continue
@@ -862,88 +1052,82 @@ class Assembler:
 
                 # Asignar dirección a las etiquetas pendientes
                 pline.address = current_pc
-                for lbl in pending_labels:
-                    self._register_symbol(symbol_table, mod, lbl, current_pc)
+                for lbl, lbl_line in pending_labels:
+                    self._register_symbol(symbol_table, mod, lbl, current_pc, lbl_line)
                 pending_labels.clear()
 
                 current_pc += data_size
 
             # Asignar dirección final a etiquetas al final del módulo
-            for lbl in pending_labels:
-                self._register_symbol(symbol_table, mod, lbl, current_pc)
+            for lbl, lbl_line in pending_labels:
+                self._register_symbol(symbol_table, mod, lbl, current_pc, lbl_line)
             pending_labels.clear()
 
             mod.end_address = current_pc
 
         return symbol_table, orig_address
 
-    def _assemble_external_pseudoops(self, modules_ast: list, symbol_table: dict):
-        """Ensambla cada referencia externa con su dirección ya resuelta."""
+    def _assemble_external_pseudoops(self, modules_ast: list, modules_by_norm: dict):
+        """Ensambla cada referencia externa verificando que exista en el módulo destino."""
         for mod in modules_ast:
-            resolver = self._create_symbol_resolver(mod, symbol_table)
             for pline in mod.lines:
-                if pline.mnemonic != ".EXTERNAL":
+                if not self._is_external_pseudoop(pline):
                     continue
                 if not pline.operands:
                     raise ValueError(
-                        f"La directiva .EXTERNAL requiere al menos una referencia "
+                        f"La directiva '{pline.mnemonic}' requiere al menos una referencia "
                         f"(línea {pline.line_num})"
                     )
 
                 for reference in pline.operands:
-                    address = resolver(reference)
+                    dep_file, dep_label = self._split_external_ref(reference, pline.line_num)
+                    norm_dep = self._normalize_mod_name(dep_file)
+                    target_mod = modules_by_norm.get(norm_dep)
+                    if target_mod is None:
+                        raise KeyError(
+                            f"Módulo externo '{dep_file}' no cargado para '{reference}' "
+                            f"(línea {pline.line_num})"
+                        )
+                    lbl_key = dep_label.lower()
+                    if lbl_key not in target_mod.symbols:
+                        raise KeyError(
+                            f"Etiqueta externa '{dep_label}' no encontrada en módulo '{dep_file}' "
+                            f"(referenciada desde '{mod.name}', línea {pline.line_num})"
+                        )
+                    address = target_mod.symbols[lbl_key]
                     result = self._assemble_pseudoop(
                         pline, operands=[address]
                     )
                     if result["KIND"] != "EXTERNAL":
                         raise ValueError(
-                            f".EXTERNAL retornó KIND='{result['KIND']}' "
+                            f"'{pline.mnemonic}' retornó KIND='{result['KIND']}' "
                             f"en la línea {pline.line_num}"
                         )
                     pline.pseudoop_result = result
 
-    def _register_symbol(self, symbol_table: dict, mod: ModuleAST, label: str, address: int):
-        """Registra un símbolo tanto en el ámbito local del módulo como en la tabla global."""
-        mod.symbols[label] = address
-        mod.symbols[label.upper()] = address
-        mod.symbols[label.lower()] = address
-
-        # Formato calificado: MODULO-ETIQUETA
-        full_ref = f"{mod.name}-{label}"
-        symbol_table[full_ref] = address
-        symbol_table[full_ref.upper()] = address
-        symbol_table[full_ref.lower()] = address
-
-        # Variantes con y sin prefijo g27_
-        if mod.name.lower().startswith("g27_"):
-            stripped_ref = f"{mod.name[4:]}-{label}"
-            symbol_table[stripped_ref] = address
-            symbol_table[stripped_ref.upper()] = address
-            symbol_table[stripped_ref.lower()] = address
-        else:
-            prefixed_ref = f"g27_{mod.name}-{label}"
-            symbol_table[prefixed_ref] = address
-            symbol_table[prefixed_ref.upper()] = address
-            symbol_table[prefixed_ref.lower()] = address
-
-        # Registro simple como fallback global si no colisiona
-        if label not in symbol_table:
-            symbol_table[label] = address
-        if label.upper() not in symbol_table:
-            symbol_table[label.upper()] = address
-        if label.lower() not in symbol_table:
-            symbol_table[label.lower()] = address
+    def _register_symbol(self, symbol_table: dict, mod: ModuleAST, label: str,
+                         address: int, line_num: int = None):
+        """Registra un símbolo en el ámbito aislado del módulo (insensible a mayúsculas)."""
+        key = label.lower()
+        if key in mod.symbols:
+            loc = f" (línea {line_num})" if line_num is not None else ""
+            raise ValueError(
+                f"Etiqueta duplicada '{label}' en módulo '{mod.name}'{loc}"
+            )
+        mod.symbols[key] = address
+        mod.symbol_names[key] = label
+        symbol_table[f"{mod.name}-{label}"] = address
 
     # -----------------------------------------------------------------------
     # Pasada 2: Generación de Código Máquina y Resolución de Operandos
     # -----------------------------------------------------------------------
 
-    def _pass_2(self, modules_ast: list, symbol_table: dict, orig_address: int) -> bytearray:
+    def _pass_2(self, modules_ast: list, modules_by_norm: dict, orig_address: int) -> bytearray:
         """Traduce cada línea a bytes de memoria en orden contiguo."""
         emitted_bytes = bytearray()
 
         for mod in modules_ast:
-            resolver = self._create_symbol_resolver(mod, symbol_table)
+            resolver = self._create_symbol_resolver(mod, modules_by_norm)
 
             for pline in mod.lines:
                 if pline.mnemonic is None:
@@ -973,20 +1157,13 @@ class Assembler:
 
                 # 2. Instrucciones de máquina
                 if pline.is_instruction:
-                    # Soporte para pseudoinstrucción NOP (alias de BR #0)
-                    if pline.mnemonic == "NOP":
-                        inst_cls = _instruction_class_for("BR")
-                        if inst_cls is None:
-                            raise ValueError("No se encontró BR en los registros de instrucciones")
-                        inst_obj = inst_cls.s_asemble_method(0, ["BR", 0])
-                    else:
-                        inst_cls = _instruction_class_for(pline.mnemonic)
-                        if inst_cls is None:
-                            raise ValueError(f"Instrucción no registrada: '{pline.mnemonic}'")
-                        format_idx, args = self._match_instruction_format(
-                            inst_cls, pline.mnemonic, pline.operands, pline.address, resolver
-                        )
-                        inst_obj = inst_cls.s_asemble_method(format_idx, args)
+                    inst_cls = _instruction_class_for(pline.mnemonic)
+                    if inst_cls is None:
+                        raise ValueError(f"Instrucción no registrada: '{pline.mnemonic}'")
+                    format_idx, args = self._match_instruction_format(
+                        inst_cls, pline.mnemonic, pline.operands, pline.address, resolver
+                    )
+                    inst_obj = inst_cls.s_asemble_method(format_idx, args)
 
                     val = int(inst_obj) & 0xFFFF
                     # Formato Little-Endian para palabras de 16 bits:
@@ -1005,130 +1182,122 @@ class Assembler:
 
         return emitted_bytes
 
-    def _create_symbol_resolver(self, mod: ModuleAST, symbol_table: dict):
-        """Crea una función de resolución de símbolos para un módulo dado."""
+    def _create_symbol_resolver(self, mod: ModuleAST, modules_by_norm: dict):
+        """Crea una función de resolución aislada al módulo y sus .EXTERNAL declarados."""
         def resolve(sym_str: str) -> int:
             s = sym_str.strip()
+            s_lower = s.lower()
 
-            # 1. Búsqueda local en el módulo actual
-            if s in mod.symbols:
-                return mod.symbols[s]
-            if s.upper() in mod.symbols:
-                return mod.symbols[s.upper()]
-            if s.lower() in mod.symbols:
-                return mod.symbols[s.lower()]
+            # 1. Búsqueda local estricta en el módulo actual (insensible a mayúsculas)
+            if s_lower in mod.symbols:
+                return mod.symbols[s_lower]
 
-            # 2. Búsqueda global (incluyendo referencias MODULO-ETIQUETA)
-            if s in symbol_table:
-                return symbol_table[s]
-            if s.upper() in symbol_table:
-                return symbol_table[s.upper()]
-            if s.lower() in symbol_table:
-                return symbol_table[s.lower()]
+            # 2. Búsqueda de referencia externa 'archivo-etiqueta' importada en este módulo
+            if '-' in s:
+                dep_file, dep_label = s.split('-', 1)
+                dep_key = (self._normalize_mod_name(dep_file), dep_label.strip().lower())
+                if dep_key in mod.external_imports:
+                    target_mod = modules_by_norm.get(dep_key[0])
+                    if target_mod is not None and dep_key[1] in target_mod.symbols:
+                        return target_mod.symbols[dep_key[1]]
 
-            # 3. Búsqueda con o sin prefijo g27_
-            if s.lower().startswith("g27_"):
-                stripped = s[4:]
-                if stripped in symbol_table:
-                    return symbol_table[stripped]
-                if stripped.upper() in symbol_table:
-                    return symbol_table[stripped.upper()]
-            else:
-                prefixed = f"g27_{s}"
-                if prefixed in symbol_table:
-                    return symbol_table[prefixed]
-                if prefixed.upper() in symbol_table:
-                    return symbol_table[prefixed.upper()]
-
-            # 4. Búsqueda de expresiones aritméticas simples: ETIQUETA + N o ETIQUETA - N
-            m = re.match(r"^(.+?)\s*([+-])\s*(#?[xX0-9a-fA-F-]+)$", s)
-            if m:
+            # 3. Expresiones aritméticas simples: ETIQUETA + N o ETIQUETA - N
+            m = re.match(r"^(.+)\s*([+-])\s*([^+\-\s]+)$", s)
+            if m and is_number(m.group(3).strip()):
                 base_sym = m.group(1).strip()
                 sign = m.group(2)
                 offset_val = parse_number(m.group(3).strip())
                 base_addr = resolve(base_sym)
                 return (base_addr + offset_val) if sign == '+' else (base_addr - offset_val)
 
+            if '-' in s:
+                raise KeyError(
+                    f"Etiqueta externa '{sym_str}' no declarada con .EXTERNAL en el módulo '{mod.name}'"
+                )
+
             raise KeyError(
                 f"Etiqueta o símbolo no encontrado: '{sym_str}' en módulo '{mod.name}'. "
-                f"Símbolos disponibles: {list(mod.symbols.keys())[:10]}..."
+                f"Símbolos disponibles: {list(mod.symbol_names.values())[:10]}..."
             )
         return resolve
 
-    def _resolve_pcoffset(self, op_str: str, current_pc: int, bits: int,
-                          is_byte: bool, resolver) -> int:
+    def _resolve_pcoffset(self, operand_type: str, op_str: str, current_pc: int,
+                          resolver) -> int:
         """
-        Calcula el desplazamiento relativo al PC (PCOFFSET) para saltos o accesos a memoria.
-        Verifica que el desplazamiento quepa en la cantidad de bits asignada.
+        Calcula y valida el desplazamiento relativo al PC (PCOFFSET / BPCOFFSET).
         """
+        spec = _OPERAND_SPECS[operand_type]
+        bits = spec["bits"]
+        is_byte = spec["is_byte"]
+
         if is_number(op_str):
-            return parse_number(op_str)
+            val, is_bit_lit = parse_number_info(op_str)
+            return _validate_numeric_operand(operand_type, val, is_bit_literal=is_bit_lit)
 
         target_addr = resolver(op_str)
         pc_next = current_pc + 2
+        diff = target_addr - pc_next
 
-        if is_byte:
-            offset = target_addr - pc_next
-        else:
-            diff = target_addr - pc_next
+        if not is_byte:
+            if diff % 2 != 0:
+                raise ValueError(
+                    f"Destino desalineado para {operand_type}: '{op_str}' "
+                    f"(destino={target_addr:#06x}, pc+2={pc_next:#06x}, diff={diff})"
+                )
             offset = diff // 2
+        else:
+            offset = diff
 
-        min_val = -(1 << (bits - 1))
-        max_val = (1 << (bits - 1)) - 1
-        if not (min_val <= offset <= max_val):
-            raise ValueError(
-                f"PCOffset fuera de rango para {bits} bits (offset={offset}, rango=[{min_val}, {max_val}]) "
-                f"al referenciar '{op_str}' (destino={target_addr:#06x}, pc+2={pc_next:#06x})"
-            )
-        return offset
+        return _validate_numeric_operand(operand_type, offset, is_bit_literal=False)
 
     def _match_instruction_format(self, inst_cls, mnemonic: str, operands: list,
                                   current_pc: int, resolver) -> tuple:
         """
-        Selecciona un formato a partir de FORMATS y convierte sus operandos.
-        La decisión no depende del nombre ni de la jerarquía de la clase.
+        Selecciona un formato compatible desde FORMATS en instrucciones.py y valida operandos.
         """
         m = mnemonic.upper()
         formats = getattr(inst_cls, "FORMATS", ())
         if not formats:
             raise ValueError(f"La instrucción '{m}' no declara formatos ensamblables")
 
-        candidates = []
-        conversion_errors = []
+        matching_formats = []
         for format_idx, inst_format in enumerate(formats):
-            operand_types = [str(field).upper() for field in inst_format
-                             if str(field).upper() != "MNEMONIC"]
+            fmt_mnemonic = str(inst_format[0]).upper()
+            if fmt_mnemonic in (m, "MNEMONIC"):
+                matching_formats.append((format_idx, inst_format))
+
+        if not matching_formats:
+            raise ValueError(
+                f"La instrucción '{m}' no tiene un formato declarado en {inst_cls.__name__}.FORMATS"
+            )
+
+        conversion_errors = []
+        for format_idx, inst_format in matching_formats:
+            operand_types = [str(field).upper() for field in inst_format[1:]]
             if len(operand_types) != len(operands):
                 continue
-            try:
-                parsed = [m]
-                for operand_type, operand in zip(operand_types, operands):
+            parsed = [m]
+            failed = False
+            for op_idx, (operand_type, operand) in enumerate(zip(operand_types, operands)):
+                try:
                     parsed.append(self._parse_format_operand(
                         operand_type, operand, current_pc, resolver
                     ))
-            except (KeyError, ValueError) as error:
-                conversion_errors.append(error)
-                continue
-            candidates.append((format_idx, parsed))
+                except (KeyError, ValueError) as error:
+                    score = (op_idx, 0 if (operand_type == "REG" and is_number(operand)) else 1)
+                    conversion_errors.append((score, error))
+                    failed = True
+                    break
+            if not failed:
+                return format_idx, parsed
 
-        # Algunas familias declaran un formato por cada mnemónico (por ejemplo,
-        # SHF/LSH/RSH); en ese caso el índice de ambos metadatos es el mismo.
-        mnemonics = [str(name).upper()
-                     for name in getattr(inst_cls, "MNEMONICS", ())]
-        if len(formats) == len(mnemonics) and m in mnemonics:
-            preferred_idx = mnemonics.index(m)
-            for format_idx, parsed in candidates:
-                if format_idx == preferred_idx:
-                    return format_idx, parsed
-
-        if candidates:
-            return candidates[0]
         if conversion_errors:
+            best_error = max(conversion_errors, key=lambda item: item[0])[1]
             raise ValueError(
-                f"Operandos inválidos para '{m}': {conversion_errors[0]}"
-            ) from conversion_errors[0]
+                f"Operandos inválidos para '{m}': {best_error}"
+            ) from best_error
 
-        expected = sorted({len(inst_format) - 1 for inst_format in formats})
+        expected = sorted({len(fmt) - 1 for _, fmt in matching_formats})
         raise ValueError(
             f"Cantidad de operandos inválida para '{m}': {len(operands)}; "
             f"se esperaba {', '.join(str(count) for count in expected)}"
@@ -1136,18 +1305,20 @@ class Assembler:
 
     def _parse_format_operand(self, operand_type: str, operand: str,
                               current_pc: int, resolver) -> int:
-        """Convierte un operando según el tipo declarado en FORMATS."""
+        """Convierte y valida un operando según el tipo declarado en FORMATS."""
         if operand_type == "REG":
             return parse_register(operand)
-        if operand_type in ("PCOFFSET8", "PCOFFSET10", "BPCOFFSET8"):
-            bits = 10 if operand_type == "PCOFFSET10" else 8
-            is_byte = operand_type.startswith("BPCOFFSET")
+        spec = _OPERAND_SPECS.get(operand_type)
+        if spec is None:
+            raise ValueError(f"Tipo de operando no reconocido en FORMATS: '{operand_type}'")
+        if spec["kind"] == "pcoffset":
             return self._resolve_pcoffset(
-                operand, current_pc, bits=bits, is_byte=is_byte, resolver=resolver
+                operand_type, operand, current_pc, resolver=resolver
             )
         if is_number(operand):
-            return parse_number(operand)
-        raise ValueError(f"se esperaba un valor numérico para {operand_type}: '{operand}'")
+            num_val, is_bit_lit = parse_number_info(operand)
+            return _validate_numeric_operand(operand_type, num_val, is_bit_literal=is_bit_lit)
+        raise ValueError(f"se esperaba un valor numérico válido para {operand_type}: '{operand}'")
 
     # -----------------------------------------------------------------------
     # Escritura de Archivos de Salida
