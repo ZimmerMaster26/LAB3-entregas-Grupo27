@@ -18,6 +18,7 @@
 import argparse
 import inspect
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -34,6 +35,29 @@ _DEFAULT_MAX_CYCLES = 1_000_000
 _PRIVILEGE_BIT = 0x8000
 _SPECIAL_GETC = 0x8001
 _SPECIAL_OUT = 0x8002
+_INVALID_KEY_CODE = 0x9F
+_INVALID_OUTPUT_CHARACTER = "?"
+
+
+def _read_console_byte():
+    if os.name.lower() == "nt":
+        import msvcrt
+
+        character = msvcrt.getwch()
+        if character in ("\x00", "\xe0"):
+            scan_code = msvcrt.getwch()
+            if not scan_code:
+                raise EOFError("No se recibió el código de la tecla especial")
+            return 0x80 | (ord(scan_code[0]) & 0x1F)
+    else:
+        character = sys.stdin.read(1)
+
+    if not character:
+        raise EOFError("No hay una tecla disponible para GETC")
+    if character[0] in ("\r", "\n"):
+        return 0x0A
+    code = ord(character[0])
+    return code if code <= 0xFF else _INVALID_KEY_CODE
 
 
 class _SpecialInstruction(instrucciones.BASE_INSTRUCTION):
@@ -141,7 +165,7 @@ class Simulador:
         self.REG[6] = self.USP
         self.OC = 0
         self.halted = False
-        self.input_fn = input if input_fn is None else input_fn
+        self.input_fn = input_fn
         self.output_fn = sys.stdout.write if output_fn is None else output_fn
         self._flush_output = output_fn is None
 
@@ -680,30 +704,47 @@ class Simulador:
 
     def _execute_special(self, instruction_value):
         if instruction_value == _SPECIAL_GETC:
-            value = self.input_fn()
-            if isinstance(value, int):
-                if not 0 <= value <= 0xFF:
-                    raise ValueError("GETC debe recibir un carácter de 8 bits")
-                self.REG[0] = value
-            elif isinstance(value, bytes):
-                if not value:
-                    raise ValueError("GETC no recibió ningún carácter")
-                self.REG[0] = value[0]
-            else:
-                text = str(value)
-                if not text:
-                    raise ValueError("GETC no recibió ningún carácter")
-                character = ord(text[0])
-                if character > 0xFF:
-                    raise ValueError("GETC solo admite caracteres de 8 bits")
-                self.REG[0] = character
+            self.REG[0] = self._read_input_byte()
         elif instruction_value == _SPECIAL_OUT:
-            self.output_fn(chr(self.REG[0] & 0xFF))
+            value = self.REG[0] & 0xFF
+            if value == 0x0A:
+                character = "\n"
+            elif value == 0x09:
+                character = "\t"
+            else:
+                character = chr(value)
+                if not character.isprintable():
+                    character = _INVALID_OUTPUT_CHARACTER
+            self.output_fn(character)
             if self._flush_output:
                 sys.stdout.flush()
         else:
             raise ValueError(f"Instrucción especial del simulador desconocida: {instruction_value:#06x}")
         self.return_from_interrupt()
+
+    def _read_input_byte(self):
+        if self.input_fn is None:
+            return _read_console_byte()
+
+        value = self.input_fn()
+        if isinstance(value, int):
+            return 0x0A if value in (0x0D, 0x0A) else value & 0xFF
+        if isinstance(value, bytes):
+            if not value:
+                raise EOFError("GETC no recibió ningún carácter")
+            code = value[0]
+            if code in (0x00, 0xE0):
+                return 0x80 | (value[1] & 0x1F) if len(value) > 1 else _INVALID_KEY_CODE
+            return 0x0A if code in (0x0D, 0x0A) else code
+        if isinstance(value, str):
+            if not value:
+                raise EOFError("GETC no recibió ningún carácter")
+            character = value[0]
+            if character in ("\r", "\n"):
+                return 0x0A
+            code = ord(character)
+            return code if code <= 0xFF else _INVALID_KEY_CODE
+        raise TypeError("input_fn debe devolver una tecla como int, bytes o str")
 
     def _total(self, counter):
         return counter["program"] + counter["system"]
@@ -787,7 +828,7 @@ def main():
         load_os=not args.no_os,
         os_path=args.os_image,
     )
-    print(json.dumps(simulator.run(), indent=2, ensure_ascii=False))
+    print("\n\n" + json.dumps(simulator.run(), indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
