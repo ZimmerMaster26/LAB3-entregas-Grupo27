@@ -108,7 +108,7 @@ class BASE_PSEUDOOP:
 class PseudoOp_ORIG(BASE_PSEUDOOP):
     """Define la dirección de inicio en memoria del programa principal."""
     MNEMONICS = [".ORIG"]
-    FORMATS = [["MNEMONIC", "ADDRESS"]]
+    FORMATS = [[".ORIG", "ADDRESS"]]
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -120,7 +120,7 @@ class PseudoOp_ORIG(BASE_PSEUDOOP):
 class PseudoOp_END(BASE_PSEUDOOP):
     """Define el final del programa o módulo en el archivo actual."""
     MNEMONICS = [".END"]
-    FORMATS = [["MNEMONIC"]]
+    FORMATS = [[".END"]]
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -130,7 +130,7 @@ class PseudoOp_END(BASE_PSEUDOOP):
 class PseudoOp_EXTERNAL(BASE_PSEUDOOP):
     """Declara una etiqueta perteneciente a otro archivo o módulo externo."""
     MNEMONICS = [".EXTERNAL"]
-    FORMATS = [["MNEMONIC", "EXT_SYMBOL"]]
+    FORMATS = [[".EXTERNAL", "EXT_SYMBOL"]]
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -146,7 +146,7 @@ class PseudoOp_EXTERNAL(BASE_PSEUDOOP):
 class PseudoOp_FILL(BASE_PSEUDOOP):
     """Define e inicializa 1 Word (16 bits / 2 Bytes) en memoria."""
     MNEMONICS = [".FILL"]
-    FORMATS = [["MNEMONIC", "VALUE_16"]]
+    FORMATS = [[".FILL", "VALUE_16"]]
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -157,7 +157,7 @@ class PseudoOp_FILL(BASE_PSEUDOOP):
 class PseudoOp_FILLB(BASE_PSEUDOOP):
     """Define e inicializa 1 Byte (8 bits) en memoria."""
     MNEMONICS = [".FILLB"]
-    FORMATS = [["MNEMONIC", "VALUE_8"]]
+    FORMATS = [[".FILLB", "VALUE_8"]]
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -168,7 +168,7 @@ class PseudoOp_FILLB(BASE_PSEUDOOP):
 class PseudoOp_BLKW(BASE_PSEUDOOP):
     """Reserva un bloque de Words en blanco (2 Bytes por Word)."""
     MNEMONICS = [".BLKW"]
-    FORMATS = [["MNEMONIC", "COUNT"]]
+    FORMATS = [[".BLKW", "COUNT"]]
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -181,7 +181,7 @@ class PseudoOp_BLKW(BASE_PSEUDOOP):
 class PseudoOp_BLKB(BASE_PSEUDOOP):
     """Reserva un bloque de Bytes en blanco (1 Byte por posición)."""
     MNEMONICS = [".BLKB"]
-    FORMATS = [["MNEMONIC", "COUNT"]]
+    FORMATS = [[".BLKB", "COUNT"]]
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
@@ -194,7 +194,7 @@ class PseudoOp_BLKB(BASE_PSEUDOOP):
 class PseudoOp_STRINGZ(BASE_PSEUDOOP):
     """Define una cadena de caracteres ASCII de 8 bits terminada en nulo ('\\0')."""
     MNEMONICS = [".STRINGZ"]
-    FORMATS = [["MNEMONIC", "STRING"]]
+    FORMATS = [[".STRINGZ", "STRING"]]
 
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):

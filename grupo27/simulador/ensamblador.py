@@ -769,18 +769,28 @@ class Assembler:
         if pseudoop_cls is None:
             raise ValueError(f"Pseudo-operación no registrada: '{pline.mnemonic}'")
 
+        m = pline.mnemonic.upper()
         formats = getattr(pseudoop_cls, "FORMATS", ())
         if not formats:
             raise ValueError(
                 f"La pseudo-operación '{pline.mnemonic}' no declara formatos ensamblables"
             )
 
+        matching_formats = [
+            (format_idx, pseudo_format)
+            for format_idx, pseudo_format in enumerate(formats)
+            if str(pseudo_format[0]).upper() in (m, "MNEMONIC")
+        ]
+        if not matching_formats:
+            raise ValueError(
+                f"La pseudo-operación '{pline.mnemonic}' no tiene formato declarado para '{m}'"
+            )
+
         operands = list(pline.operands if operands is None else operands)
         defaulted_empty_string = False
         if not operands:
-            for pseudo_format in formats:
-                operand_types = [str(field).upper() for field in pseudo_format
-                                 if str(field).upper() != "MNEMONIC"]
+            for _, pseudo_format in matching_formats:
+                operand_types = [str(field).upper() for field in pseudo_format[1:]]
                 if operand_types == ["COUNT"]:
                     operands = ["1"]
                     break
@@ -791,9 +801,8 @@ class Assembler:
 
         conversion_errors = []
         selected = None
-        for format_idx, pseudo_format in enumerate(formats):
-            operand_types = [str(field).upper() for field in pseudo_format
-                             if str(field).upper() != "MNEMONIC"]
+        for format_idx, pseudo_format in matching_formats:
+            operand_types = [str(field).upper() for field in pseudo_format[1:]]
             if len(operand_types) != len(operands):
                 if not (operand_types == ["EXT_SYMBOL"] and operands):
                     continue
@@ -846,7 +855,7 @@ class Assembler:
                 raise ValueError(
                     f"Operandos inválidos para '{pline.mnemonic}': {conversion_errors[0]}"
                 ) from conversion_errors[0]
-            expected = sorted({len(pseudo_format) - 1 for pseudo_format in formats})
+            expected = sorted({len(fmt) - 1 for _, fmt in matching_formats})
             raise ValueError(
                 f"Cantidad de operandos inválida para '{pline.mnemonic}': "
                 f"{len(pline.operands)}; se esperaba "

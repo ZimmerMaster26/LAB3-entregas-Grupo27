@@ -781,15 +781,15 @@ class Instruction_XOR(BASE_INSTRUCTION):
 class Instruction_LEA(BASE_INSTRUCTION):
     OPCODE = 15
     MNEMONICS = ["LEA"]
-    FORMATS = [["LEA", "REG", "PCOFFSET8"]]
+    FORMATS = [["LEA", "REG", "BPCOFFSET8"]]
 
     def __init__(self, instruction_value):
         super().__init__(instruction_value)
-        self.DR        = get_bits(instruction_value, 10,  8, unsigned=True)
-        self.PCOFFSET8 = get_bits(instruction_value,  7,  0)
+        self.DR         = get_bits(instruction_value, 10,  8, unsigned=True)
+        self.BPCOFFSET8 = get_bits(instruction_value,  7,  0)
 
     def on_execute(self, machine):
-        self.address = (machine.PC + 2 + (2 * self.PCOFFSET8)) & 0xFFFF
+        self.address = (machine.PC + 2 + self.BPCOFFSET8) & 0xFFFF
         return super().on_execute(machine)
 
     def on_writeback(self, machine):
@@ -799,12 +799,12 @@ class Instruction_LEA(BASE_INSTRUCTION):
     @classmethod
     def s_asemble_method(cls, format_idx, arguments):
         dr = int(arguments[1])
-        pcoffset8 = int(arguments[2]) & 0xFF
-        val = (cls.OPCODE << 11) | ((dr & 7) << 8) | pcoffset8
+        bpcoffset8 = int(arguments[2]) & 0xFF
+        val = (cls.OPCODE << 11) | ((dr & 7) << 8) | bpcoffset8
         return cls(val)
 
     def disasemble(self):
-        return f"LEA R{self.DR}, #{self.PCOFFSET8}"
+        return f"LEA R{self.DR}, #{self.BPCOFFSET8}"
 
 
 # 16: RTI
@@ -1082,6 +1082,39 @@ class Instruction_JMP(BASE_INSTRUCTION):
         return f"JMP R{self.BASER}"
 
 
+def _execute_shift(val, n, overflow_bits=False):
+    """
+    Ejecuta un desplazamiento lógico de 16 bits.
+    - n > 0: desplazamiento a izquierda por min(n, 16) bits.
+    - n < 0: desplazamiento a derecha por min(-n, 16) bits.
+    - overflow_bits=True (SHFO/SHRO): devuelve los bits que sobresalen hacia el
+      registro auxiliar adyacente (a la izquierda en LSH, a la derecha en RSH).
+    """
+    u_val = val & 0xFFFF
+    if n > 0:
+        shift_amount = min(n, 16)
+        carry = (u_val >> (16 - shift_amount)) & 1
+        shifted = (u_val << shift_amount) & 0xFFFF
+        aux = (u_val >> (16 - shift_amount)) & 0xFFFF
+        out_raw = aux if overflow_bits else shifted
+        result = get_bits(out_raw, 15, 0)
+        shifted_signed = get_bits(shifted, 15, 0)
+        overflow = 1 if ((val << shift_amount) != shifted_signed) else 0
+    elif n < 0:
+        shift_amount = min(-n, 16)
+        carry = (u_val >> (shift_amount - 1)) & 1
+        shifted = u_val >> shift_amount
+        aux = (u_val << (16 - shift_amount)) & 0xFFFF
+        out_raw = aux if overflow_bits else shifted
+        result = get_bits(out_raw, 15, 0)
+        overflow = 0
+    else:
+        result = 0 if overflow_bits else val
+        carry = 0
+        overflow = 0
+    return result, carry, overflow
+
+
 # 23: SHF (SHF / LSH / RSH)
 class Instruction_SHF(BASE_INSTRUCTION):
     OPCODE = 23
@@ -1095,31 +1128,9 @@ class Instruction_SHF(BASE_INSTRUCTION):
         self.NSH5 = get_bits(instruction_value,  4,  0)
 
     def on_execute(self, machine):
-        val = machine.REG[self.SR]
-        n = self.NSH5
-        u_val = val & 0xFFFF
-        carry = 0
-        overflow = 0
-
-        if n > 0: # Desplazamiento a izquierda
-            shift_amount = min(n, 16)
-            carry = (u_val >> (16 - shift_amount)) & 1 if shift_amount > 0 else 0
-            raw_res = (u_val << n) & 0xFFFF
-            result = get_bits(raw_res, 15, 0)
-            overflow = 1 if ((val << n) != result) else 0
-        elif n < 0: # Desplazamiento a derecha
-            shift_amount = min(-n, 16)
-            carry = (u_val >> (shift_amount - 1)) & 1 if shift_amount > 0 else 0
-            result = get_bits(u_val >> shift_amount, 15, 0)
-            overflow = 0
-        else:
-            result = val
-            carry = 0
-            overflow = 0
-
-        self.result = result
-        self.carry = carry
-        self.overflow = overflow
+        self.result, self.carry, self.overflow = _execute_shift(
+            machine.REG[self.SR], self.NSH5, overflow_bits=False
+        )
         return super().on_execute(machine)
 
     def on_writeback(self, machine):
@@ -1161,31 +1172,9 @@ class Instruction_SHFO(BASE_INSTRUCTION):
         self.NSH5 = get_bits(instruction_value,  4,  0)
 
     def on_execute(self, machine):
-        val = machine.REG[self.SR]
-        n = self.NSH5
-        u_val = val & 0xFFFF
-        carry = 0
-        overflow = 0
-
-        if n > 0: # Desplazamiento a izquierda
-            shift_amount = min(n, 16)
-            carry = (u_val >> (16 - shift_amount)) & 1 if shift_amount > 0 else 0
-            raw_res = (u_val << n) & 0xFFFF
-            result = get_bits(raw_res, 15, 0)
-            overflow = 1 if ((val << n) != result) else 0
-        elif n < 0: # Desplazamiento a derecha
-            shift_amount = min(-n, 16)
-            carry = (u_val >> (shift_amount - 1)) & 1 if shift_amount > 0 else 0
-            result = get_bits(u_val >> shift_amount, 15, 0)
-            overflow = 0
-        else:
-            result = val
-            carry = 0
-            overflow = 0
-
-        self.result = result
-        self.carry = carry
-        self.overflow = overflow
+        self.result, self.carry, self.overflow = _execute_shift(
+            machine.REG[self.SR], self.NSH5, overflow_bits=True
+        )
         return super().on_execute(machine)
 
     def on_writeback(self, machine):
@@ -1228,31 +1217,10 @@ class Instruction_SHR(BASE_INSTRUCTION):
         self.SR2  = get_bits(instruction_value,  2,  0, unsigned=True)
 
     def on_execute(self, machine):
-        val = machine.REG[self.SR1]
         n = get_bits(machine.REG[self.SR2], 4, 0) # 5 bits signed from SR2
-        u_val = val & 0xFFFF
-        carry = 0
-        overflow = 0
-
-        if n > 0:
-            shift_amount = min(n, 16)
-            carry = (u_val >> (16 - shift_amount)) & 1 if shift_amount > 0 else 0
-            raw_res = (u_val << n) & 0xFFFF
-            result = get_bits(raw_res, 15, 0)
-            overflow = 1 if ((val << n) != result) else 0
-        elif n < 0:
-            shift_amount = min(-n, 16)
-            carry = (u_val >> (shift_amount - 1)) & 1 if shift_amount > 0 else 0
-            result = get_bits(u_val >> shift_amount, 15, 0)
-            overflow = 0
-        else:
-            result = val
-            carry = 0
-            overflow = 0
-
-        self.result = result
-        self.carry = carry
-        self.overflow = overflow
+        self.result, self.carry, self.overflow = _execute_shift(
+            machine.REG[self.SR1], n, overflow_bits=(self.MODE == 1)
+        )
         return super().on_execute(machine)
 
     def on_writeback(self, machine):
