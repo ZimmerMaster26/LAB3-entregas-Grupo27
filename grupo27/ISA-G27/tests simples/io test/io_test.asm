@@ -5,15 +5,14 @@
     PUTS
 
 loop
-    GETC
-    OUT
+    IN
     ADD R0 R0 #-8
     ADD R0 R0 #-2
     BRnp loop
 
     HALT
 
-prompt  .STRINGZ "pulse teclas - pulse INTRO para salir\n"
+prompt  .STRINGZ "Pruebe teclas teclas - pulse INTRO para salir\n"
 
 
 .END

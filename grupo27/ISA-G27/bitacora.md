@@ -51,4 +51,8 @@
 - Generación de un sistema operativo provisional.
 - Testeos del benchmark.
 
+### Viernes 27, Nov 2026
+
+- Revisión final.
+- Documentación de manual de uso.
 
