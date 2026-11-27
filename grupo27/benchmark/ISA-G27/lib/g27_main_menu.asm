@@ -103,23 +103,27 @@ mm_state_init_ptr:      .FILL main_menu_init
 ; --- Controlador: mostrar menú o despachar operación del bloque ---
 main_menu_show_menu:
         LD      R1, mm_sm_cursor
+        LDR     R2, R1, #0
+        ADD     R2, R2, #0
         BRz     main_menu_show_menu_sk1
 
-        LDR     R0, R1, #0
-        ADD     R1, R1, #2
-        ST      R1, mm_sm_cursor
+        LDR     R0, R2, #0
+        ADD     R2, R2, #2
+        STR     R2, R1, #0
 
         LSH     R0, R0, #1
         LD      R5, mm_sm_op_table
         ADD     R5, R5, R0
         LDR     R5, R5, #0
-        ST      R5, mm_sm_state
+        LD      R1, mm_sm_state
+        STR     R5, R1, #0
 
         LDR     R0, R5, #0
         JMP     R0
 
 main_menu_show_menu_sk1:
         LD      R5, mm_sm_state
+        LDR     R5, R5, #0
         LDR     R0, R5, #1
         PUTS
 
@@ -268,9 +272,10 @@ main_menu_two_q8_result_dq16:
 ; --- Controlador de ejecución en modo interactivo ---
 main_menu_call:
         LD      R4, mm_ic_cursor
+        LDR     R4, R4, #0
         BRz     main_menu_call_inter
-        LD      R1, mm_ic_call_op
-        JMP     R1
+        LD      R3, mm_ic_call_op
+        JMP     R3
 
 main_menu_call_inter:
         ST      R0, mm_ic_aux2
@@ -278,6 +283,7 @@ main_menu_call_inter:
         ST      R2, mm_ic_aux4
 
         LD      R5, mm_ic_state
+        LDR     R5, R5, #0
         LDR     R0, R5, #1
         PUTS
 
@@ -368,15 +374,18 @@ main_menu_call_op:
         ST      R1, mm_op_aux3
         ST      R2, mm_op_aux4
 
-        LD      R5, mm_op_state
-        LD      R4, mm_op_cursor
+        LD      R1, mm_op_state
+        LDR     R5, R1, #0
+        LD      R1, mm_op_cursor
+        LDR     R4, R1, #0
 
         LDR     R0, R4, #0
         ST      R0, mm_op_aux0
         LDR     R0, R4, #1
         ST      R0, mm_op_aux1
 
-        LD      R0, mm_op_verbose
+        LD      R1, mm_op_verbose
+        LDR     R0, R1, #0
         BRz     main_menu_call_op_exec
 
         LDR     R0, R5, #1
@@ -423,7 +432,8 @@ main_menu_call_op_exec:
         ST      R0, mm_op_aux0
         ST      R1, mm_op_aux1
 
-        LD      R0, mm_op_verbose
+        LD      R1, mm_op_verbose
+        LDR     R0, R1, #0
         BRz     main_menu_call_op_save_result
 
         LD      R1, mm_op_aux4
@@ -457,7 +467,8 @@ main_menu_call_op_save_sk1:
 
         LD      R1, mm_op_k8
         ADD     R4, R4, R1
-        ST      R4, mm_op_cursor
+        LD      R1, mm_op_cursor
+        STR     R4, R1, #0
 
         AND     R0, R0, #0
         LD      R1, mm_op_swap_node
@@ -589,9 +600,8 @@ main_menu_prompt_q11_text:  .STRINGZ "(Q4.11) "
 main_menu_prompt_q12_text:  .STRINGZ "(Q3.12) "
 main_menu_prompt_q13_text:  .STRINGZ "(Q2.13) "
 main_menu_prompt_q14_text:  .STRINGZ "(Q1.14) "
-main_menu_prompt_q15_text:  .FILL main_menu_prompt_q15_text_str
+main_menu_prompt_q15_text:  .STRINGZ "(Q0.15) "
 main_menu_prompt_q16_text:  .STRINGZ "(Q15.16) "
-main_menu_prompt_q15_text_str: .STRINGZ "(Q0.15) "
 
 ;=====================================================================
 ; PUNTEROS A SUBRUTINAS EXTERNAS

@@ -12,10 +12,12 @@ SUB_BASE_BIN:
         ST      R7, BASE_SAVE_R7
 
         ADD     R2, R0, #0          ; R2 = copia del valor a imprimir
+        ST      R2, BASE_WORK
 
         LEA     R0, BASE_BIN_LBL
         PUTS
 
+        LD      R2, BASE_WORK
         LD      R3, BASE_VAL_16     ; R3 = contador de 16 bits
 
 BASE_BIN_BUCLE:
@@ -53,10 +55,12 @@ SUB_BASE_HEX:
         ST      R7, BASE_SAVE_R7
 
         ADD     R2, R0, #0          ; R2 = copia del valor a imprimir
+        ST      R2, BASE_WORK
 
         LEA     R0, BASE_HEX_LBL
         PUTS
 
+        LD      R2, BASE_WORK
         AND     R4, R4, #0
         ADD     R4, R4, #4          ; R4 = 4 dígitos hexadecimales
 
@@ -109,5 +113,6 @@ BASE_SAVE_R3:   .FILL #0
 BASE_SAVE_R4:   .FILL #0
 BASE_SAVE_R5:   .FILL #0
 BASE_SAVE_R7:   .FILL #0
+BASE_WORK:      .FILL #0
 
 .END

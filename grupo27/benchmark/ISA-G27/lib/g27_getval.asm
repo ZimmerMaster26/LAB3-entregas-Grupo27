@@ -160,7 +160,7 @@ getval_out:
 
         LEA     R0, getval_lbraket
         PUTS
-        ADD     R0, R2, #0
+        LD      R0, getval_buf_ads
         PUTS
         LEA     R0, getval_rbraket
         PUTS

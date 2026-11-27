@@ -5,7 +5,7 @@
 ;     R0 = a_q8 (primer factor en Q7.8 con signo)
 ;     R1 = b_q8 (segundo factor en Q7.8 con signo)
 ;   Salidas:
-;     R0 = producto en Q7.8 con signo (0 si R1 != 0)
+;     R0 = producto en Q7.8 con signo (0 si desborda)
 ;     R1 = estado:
 ;            0 = OK
 ;            1 = desbordamiento (|a * b| > 127.996)
@@ -76,6 +76,7 @@ CM_Z_NEG:
         ; Restar 32 bits: y = y - x
         LD      R0, CM_Y_LO
         LD      R1, CM_X_LO
+        BRz     CM_Z_NEG_LO_ZERO
         NOT     R1, R1
         ADD     R1, R1, #1
         ADD     R0, R0, R1          ; y.lo - x.lo (C=1 si no hubo borrow)
@@ -85,6 +86,16 @@ CM_Z_NEG:
         LD      R1, CM_X_HI
         NOT     R1, R1              ; ~x.hi (sumar C equivale a ~x.hi + 1 - borrow)
         ADC     R0, R0, R1          ; y.hi = y.hi + ~x.hi + C
+        ST      R0, CM_Y_HI
+        BR      CM_SIGUE
+
+CM_Z_NEG_LO_ZERO:
+        ST      R0, CM_Y_LO
+        LD      R0, CM_Y_HI
+        LD      R1, CM_X_HI
+        NOT     R1, R1
+        ADD     R0, R0, R1
+        ADD     R0, R0, #1          ; Con palabra baja cero, no hay préstamo
         ST      R0, CM_Y_HI
 
 CM_SIGUE:

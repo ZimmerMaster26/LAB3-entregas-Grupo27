@@ -18,9 +18,9 @@ ptr_programa_completo:  .FILL programa_del_menu_completo
 
 main:
         ; --- Seleccionar modo descomentar/comentar una de las 3 opciones ---
-        AND     R0, R0, #0                  ; 0 = menú interactivo normal
+        ; AND     R0, R0, #0                  ; 0 = menú interactivo normal
         ; LD    R0, ptr_programa_menu       ; Bloque reducido de pruebas
-        ; LD    R0, ptr_programa_completo   ; Bloque completo de 23 ops
+         LD    R0, ptr_programa_completo   ; Bloque completo de 23 ops
 
         LD      R1, sub_main_menu
         JSRR    R1
@@ -170,7 +170,7 @@ programa_del_menu_completo:
     .FILL   #0      ; espacio sin uso
 
     .FILL   #19     ; LOGARITMO BORCHARDT: ln(1) = 0
-    .FILL   x0100   ; 1.0 (Q7.8)
+    .FILL   x0080   ; 1.0 (Q8.7)
     .FILL   #0      ; segundo operando no utilizado
     .FILL   #0      ; resultado (Q7.8)
     .FILL   #0      ; espacio sin uso

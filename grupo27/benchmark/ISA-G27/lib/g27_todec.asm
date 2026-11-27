@@ -175,7 +175,7 @@ td_a_chr_zero:      .FILL todec_chr_zero
 td_a_dec:           .FILL todec_dec
 td_a_ret:           .FILL todec_ret
 
-        ; --- 4. Parte fraccionaria (acumular fracción * 10^9 en 32 bits) ---
+        ; --- 4. Parte fraccionaria (acumular fracción * 10^9 en 48 bits) ---
 todec_dec:
         LD      R0, td_a_chr_dot
         LDR     R0, R0, #0
@@ -186,16 +186,17 @@ todec_dec:
         STI     R2, td_a_cursor_wr
 
         AND     R0, R0, #0
-        STI     R0, td_b_frac_h
-        STI     R0, td_b_frac_l
-        STI     R0, td_b_aux_0
+        STI     R0, td_c_frac_h
+        STI     R0, td_c_frac_l
+        STI     R0, td_c_frac_top
+        STI     R0, td_c_aux_0
 
-        LD      R0, td_b_frac_expr_h
+        LD      R0, td_c_frac_expr_h
         LDR     R0, R0, #0
-        STI     R0, td_b_aux_1
-        LD      R0, td_b_frac_expr_l
+        STI     R0, td_c_aux_1
+        LD      R0, td_c_frac_expr_l
         LDR     R0, R0, #0
-        STI     R0, td_b_aux_2
+        STI     R0, td_c_aux_2
 
         AND     R5, R5, #0
         ADD     R5, R5, #1              ; mascara = 1
@@ -204,35 +205,39 @@ todec_dec_loop1:
         ADD     R5, R5, #0
         BRz     todec_dec_break1
 
-        LD      R0, td_b_fraccion
+        LD      R0, td_c_fraccion
         LDR     R0, R0, #0
         AND     R0, R0, R5
         BRz     todec_dec_continue1
 
-        LD      R0, td_b_frac_l
+        LD      R0, td_c_frac_l
         LDR     R0, R0, #0
-        LD      R1, td_b_aux_2
+        LD      R1, td_c_aux_2
         LDR     R1, R1, #0
-        AND     R2, R2, #0
         ADD     R0, R0, R1
-        ADC     R2, R2, R2
-        STI     R0, td_b_frac_l
+        STI     R0, td_c_frac_l
 
-        LD      R0, td_b_frac_h
+        LD      R0, td_c_frac_h
         LDR     R0, R0, #0
-        LD      R1, td_b_aux_1
+        LD      R1, td_c_aux_1
         LDR     R1, R1, #0
-        ADD     R0, R0, R1
-        ADD     R0, R0, R2
-        STI     R0, td_b_frac_h
+        ADC     R0, R0, R1
+        STI     R0, td_c_frac_h
+
+        LD      R0, td_c_frac_top
+        LDR     R0, R0, #0
+        LD      R1, td_c_aux_0
+        LDR     R1, R1, #0
+        ADC     R0, R0, R1
+        STI     R0, td_c_frac_top
 
 todec_dec_continue1:
         ; [aux_0:aux_1:aux_2] <<= 1
-        LD      R0, td_b_aux_0
+        LD      R0, td_c_aux_0
         LDR     R0, R0, #0
-        LD      R1, td_b_aux_1
+        LD      R1, td_c_aux_1
         LDR     R1, R1, #0
-        LD      R2, td_b_aux_2
+        LD      R2, td_c_aux_2
         LDR     R2, R2, #0
 
         LSHO    R3, R2, #1
@@ -245,14 +250,32 @@ todec_dec_continue1:
         LSH     R0, R0, #1
         OR      R0, R0, R4
 
-        STI     R0, td_b_aux_0
-        STI     R1, td_b_aux_1
-        STI     R2, td_b_aux_2
+        STI     R0, td_c_aux_0
+        STI     R1, td_c_aux_1
+        STI     R2, td_c_aux_2
 
         ADD     R5, R5, R5
         BR      todec_dec_loop1
 
+td_c_fraccion:      .FILL todec_fraccion
+td_c_frac_top:      .FILL todec_fraccion_top
+td_c_frac_h:        .FILL todec_fraccion_h
+td_c_frac_l:        .FILL todec_fraccion_l
+td_c_aux_0:         .FILL todec_aux_0
+td_c_aux_1:         .FILL todec_aux_1
+td_c_aux_2:         .FILL todec_aux_2
+td_c_frac_expr_h:   .FILL todec_frac_expr_h
+td_c_frac_expr_l:   .FILL todec_frac_expr_l
+
 todec_dec_break1:
+        ; Descartar los 16 bits fraccionales del producto frac * 10^9.
+        LD      R0, td_c_frac_top
+        LDR     R0, R0, #0
+        LD      R1, td_c_frac_h
+        LDR     R1, R1, #0
+        STI     R0, td_c_frac_h
+        STI     R1, td_c_frac_l
+
         ; Extraer 9 dígitos decimales restando 10^8, 10^7, ..., 10^0
         LD      R5, td_b_expr_vec
         AND     R4, R4, #0              ; dígito = 0
@@ -371,6 +394,7 @@ todec_cursor_wr:    .FILL #0
 todec_format:       .FILL #0
 todec_fraccion_h:   .FILL #0
 todec_fraccion_l:   .FILL #0
+todec_fraccion_top: .FILL #0
 todec_aux_0:        .FILL #0
 todec_aux_1:        .FILL #0
 todec_aux_2:        .FILL #0

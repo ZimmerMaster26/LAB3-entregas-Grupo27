@@ -58,10 +58,7 @@ FIND_S_DONE:
         ; Normalizar divisor R2 a Q3.12 en [1.0, 2.0) desplazando (4 - s) bits:
         ; Si (4 - s) > 0 -> izquierda; si (4 - s) < 0 -> derecha
         AND     R4, R4, #0
-        ADD     R4, R4, #4
-        NOT     R3, R3
-        ADD     R3, R3, #1
-        ADD     R4, R4, R3          ; R4 = 4 - s (en [-11, +4])
+        ADD     R4, R3, #-4         ; R4 = s - 4 (en [-4, +11])
         SHR     R2, R2, R4          ; R2 = divisor normalizado en Q3.12 (x1000..x1FFF)
 
         ; Obtener índice [0..7] de TABLA_LUT: (R2 >> 8) & x0007

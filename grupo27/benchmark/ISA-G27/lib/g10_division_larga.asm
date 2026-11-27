@@ -60,8 +60,10 @@ A_POS:
         ADD     R2, R2, #2          ; R2 = 16
 
 LAZO:
-        LSHO    R0, R0, #1          ; R0 <<= 1, bit 15 saliente va al flag Carry (c)
-        ADC     R1, R1, R1          ; R1 = (R1 << 1) + Carry (entra el bit de R0)
+        LSHO    R4, R0, #1          ; Extraer el bit alto de la palabra baja
+        LSH     R0, R0, #1          ; Desplazar la palabra baja para el siguiente bit
+        LSH     R1, R1, #1
+        ADD     R1, R1, R4          ; Incorporar el bit saliente
 
         ADD     R1, R1, #0
         BRn     L_SIEMPRE           ; Si resto >= x8000, seguro es >= |b|

@@ -13,28 +13,28 @@ CALCULAR_SENO:
         ST      R5, SEN_SAVE_R5
         ST      R7, SEN_SAVE_R7
 
-        ; 1. Reducir ángulo a [-3600, +3600) deci-grados usando MOD
+        ; 1. Reducir el valor absoluto a [0, 3599] deci-grados.
         LD      R4, C_3600
+        AND     R5, R5, #0
+        ADD     R5, R5, #1          ; signo inicial = +1
+        ADD     R0, R0, #0
+        BRzp    SEN_ABS_READY
+        NOT     R0, R0
+        ADD     R0, R0, #1
+        NOT     R5, R5
+        ADD     R5, R5, #1          ; signo inicial = -1
+SEN_ABS_READY:
         MOD     R0, R0, R4          ; R0 = angulo mod 3600
 
-        ; Si R0 < 0, sumar 3600 para llevarlo a [0, 3599]
-        ADD     R0, R0, #0
-        BRzp    SEN_MOD_POS
-        ADD     R0, R0, R4
-SEN_MOD_POS:
-
-        ; 2. Reducción a [-900, +900] deci-grados y signo del seno en R5:
-        ;    R5 = +1 por defecto, R5 = -1 si cae en [1800..3600)
-        AND     R5, R5, #0
-        ADD     R5, R5, #1          ; signo = +1
+        ; 2. Reducción al primer cuadrante y ajuste del signo.
 
         LD      R1, NEG_1800
         ADD     R2, R0, R1          ; R2 = angulo - 1800
         BRn     SEN_HALF_LOW
         ; angulo >= 1800 -> angulo = angulo - 1800, signo = -1
         ADD     R0, R2, #0
-        AND     R5, R5, #0
-        ADD     R5, R5, #-1         ; signo = -1
+        NOT     R5, R5
+        ADD     R5, R5, #1          ; Cambiar signo
 
 SEN_HALF_LOW:
         ; Ahora R0 está en [0, 1799]. Si R0 > 900, plegar respecto a 1800: angulo = 1800 - R0
@@ -76,12 +76,21 @@ SEN_NO_BRW_1800:
         BR      SEN_LOOP_1800
 
 SEN_ADD_REM_1800:
-        DIV     R2, R2, R4
-        ADD     R2, R1, R2
+        NOT     R7, R4
+        ADD     R7, R7, #1          ; R7 = -1800
+SEN_REM_LOOP:
+        ADD     R2, R2, R7
+        BRc     SEN_REM_SUBTRACTED
+        ADD     R2, R2, R4          ; Restaurar si el resto era menor que 1800
+        ADD     R2, R1, #0
         BR      SEN_X_READY
+SEN_REM_SUBTRACTED:
+        ADD     R1, R1, #1
+        BR      SEN_REM_LOOP
 
 SEN_DIV_1800_LOW:
-        DIV     R2, R2, R4          ; R2 = x en Q3.12
+        AND     R1, R1, #0
+        BR      SEN_ADD_REM_1800
 
 SEN_X_READY:
         ST      R2, SEN_X_Q12
@@ -94,43 +103,50 @@ SEN_X_READY:
         OR      R3, R1, R0          ; R3 = x^2 en Q3.12
         ST      R3, SEN_X2_Q12
 
-        ; 5. Calcular x^3 en Q3.12: ((x^2 * x) >> 12)
-        MUL     R0, R3, R2
-        MULH    R1, R3, R2
+        BR      SEN_TAYLOR_START
+SEN_SAVE_R1:    .FILL #0
+SEN_SAVE_R2:    .FILL #0
+SEN_SAVE_R3:    .FILL #0
+SEN_SAVE_R4:    .FILL #0
+SEN_SAVE_R5:    .FILL #0
+SEN_SAVE_R7:    .FILL #0
+SEN_TAYLOR_START:
+        ; 5. Calcular T2 = -x^3/6 sin desbordar x^3 en Q3.12:
+        ;    T2 = -((x^2 / 6) * x)
+        LD      R1, C_6
+        DIV     R4, R3, R1
+        MUL     R0, R4, R2
+        MULH    R1, R4, R2
         LSH     R1, R1, #4
         RSH     R0, R0, #12
-        OR      R4, R1, R0          ; R4 = x^3 en Q3.12
-        ST      R4, SEN_X3_Q12
-
-        ; T2 = -(x^3 / 6)
-        LD      R1, C_6
-        DIV     R0, R4, R1
+        OR      R4, R1, R0          ; Magnitud de T2 en Q3.12
+        ADD     R0, R4, #0
         NOT     R0, R0
         ADD     R0, R0, #1
         ST      R0, SEN_T2_Q12
 
-        ; 6. Calcular x^5 en Q3.12: ((x^3 * x^2) >> 12)
+        ; 6. T3 = -T2 * x^2 / 20
         LD      R2, SEN_X2_Q12
+        LD      R4, SEN_T2_Q12
+        NOT     R4, R4
+        ADD     R4, R4, #1          ; Magnitud de T2
         MUL     R0, R4, R2
         MULH    R1, R4, R2
         LSH     R1, R1, #4
         RSH     R0, R0, #12
-        OR      R4, R1, R0          ; R4 = x^5 en Q3.12
-
-        ; T3 = +(x^5 / 120)
-        LD      R1, C_120
+        OR      R4, R1, R0          ; |T2| * x^2 en Q3.12
+        LD      R1, C_20
         DIV     R0, R4, R1
         ST      R0, SEN_T3_Q12
 
-        ; 7. Calcular x^7 en Q3.12: ((x^5 * x^2) >> 12)
+        ; 7. T4 = -T3 * x^2 / 42
+        LD      R4, SEN_T3_Q12
         MUL     R0, R4, R2
         MULH    R1, R4, R2
         LSH     R1, R1, #4
         RSH     R0, R0, #12
-        OR      R4, R1, R0          ; R4 = x^7 en Q3.12
-
-        ; T4 = -(x^7 / 5040)
-        LD      R1, C_5040
+        OR      R4, R1, R0          ; T3 * x^2 en Q3.12
+        LD      R1, C_42
         DIV     R0, R4, R1
         NOT     R0, R0
         ADD     R0, R0, #1
@@ -170,21 +186,13 @@ NEG_1800:       .FILL #-1800
 NEG_900:        .FILL #-900
 C_PI_Q12:       .FILL #12868        ; round(pi * 4096)
 C_6:            .FILL #6
-C_120:          .FILL #120
-C_5040:         .FILL #5040
+C_20:           .FILL #20
+C_42:           .FILL #42
 
 SEN_X_Q12:      .FILL #0
 SEN_X2_Q12:     .FILL #0
-SEN_X3_Q12:     .FILL #0
 SEN_T2_Q12:     .FILL #0
 SEN_T3_Q12:     .FILL #0
 SEN_T4_Q12:     .FILL #0
-
-SEN_SAVE_R1:    .FILL #0
-SEN_SAVE_R2:    .FILL #0
-SEN_SAVE_R3:    .FILL #0
-SEN_SAVE_R4:    .FILL #0
-SEN_SAVE_R5:    .FILL #0
-SEN_SAVE_R7:    .FILL #0
 
 .END

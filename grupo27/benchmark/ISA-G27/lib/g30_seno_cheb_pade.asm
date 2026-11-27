@@ -5,7 +5,7 @@
 ;             A = 3672 / 16384 (0.2241), B = 1814 / 16384 (0.1107)
 ;   Entrada:  R0 = ángulo x en radianes (formato Q3.12 con signo)
 ;   Salida:   R0 = sen(x) en formato Q1.14 con signo (1.0 = 16384 = x4000)
-;   Conserva: R1-R7 (todos intactos, incluyendo R6).
+;   Conserva: R1-R5 y R7; no utiliza R6.
 ;=====================================================================
 SEN_CHEB_PADE:
         ST      R1, SN_R1
@@ -54,11 +54,35 @@ SN_TO_Q14:
         BRz     SN_EXIT             ; Si x == 0 -> sen(0) = 0
         ST      R4, SN_SIGN
         ST      R0, SN_X
+        BR      SN_KERNEL
 
+SN_ONE:         .FILL #16384        ; 1.0 en Q1.14 (2^14)
+SN_NEG_ONE:     .FILL #-16384       ; -1.0 en Q1.14
+SN_HALF:        .FILL #8192         ; 0.5 en Q1.14 (2^13, redondeo)
+SN_N2PI:        .FILL #-25736       ; -2*pi en Q3.12
+SN_PI:          .FILL #12868        ; +pi en Q3.12
+SN_NPI:         .FILL #-12868       ; -pi en Q3.12
+SN_NHALFPI:     .FILL #-6434        ; -pi/2 en Q3.12
+SN_A:           .FILL #3672         ; A = 0.2241 en Q1.14
+SN_B:           .FILL #1814         ; B = 0.1107 en Q1.14
+SN_SIGN:        .FILL #0
+SN_X:           .FILL #0
+SN_NUM:         .FILL #0
+SN_U:           .FILL #0
+SN_DEN:         .FILL #0
+SN_R1:          .FILL #0
+SN_R2:          .FILL #0
+SN_R3:          .FILL #0
+SN_R4:          .FILL #0
+SN_R5:          .FILL #0
+SN_R7:          .FILL #0
+
+SN_KERNEL:
         ; ---- 2. Núcleo racional Chebyshev-Padé (Q1.14) ----
         ; 2a) u = (x * x + 2^14) >> 15  (x^2 / 2 redondeado en Q1.14)
-        MUL     R2, R0, R0          ; Bits bajos [15:0] de x^2
-        MULH    R3, R0, R0          ; Bits altos [31:16] de x^2
+        ADD     R1, R0, #0
+        MUL     R2, R0, R1
+        MULH    R3, R0, R1
         LD      R1, SN_ONE          ; 16384 = 2^14 (redondeo para >> 15)
         AND     R5, R5, #0
         ADD     R2, R2, R1
@@ -66,12 +90,15 @@ SN_TO_Q14:
         LSH     R3, R3, #1          ; Bits altos desplazados para >> 15
         RSH     R2, R2, #15         ; Bit 15 de la palabra baja pasa a bit 0
         OR      R4, R3, R2          ; R4 = u en Q1.14
+        ST      R4, SN_U
 
         ; 2b) num = 1.0 - ((A * u + 2^13) >> 14)
+        ADD     R0, R4, #0
         LD      R1, SN_A            ; A = 3672
-        MUL     R2, R4, R1
-        MULH    R3, R4, R1
+        MUL     R2, R0, R1
+        MULH    R3, R0, R1
         LD      R1, SN_HALF         ; 8192 = 2^13 (redondeo para >> 14)
+        AND     R5, R5, #0
         ADD     R2, R2, R1
         ADC     R3, R3, R5
         LSH     R3, R3, #2          ; Bits altos para >> 14
@@ -85,10 +112,12 @@ SN_TO_Q14:
         ST      R2, SN_NUM
 
         ; 2c) den = 1.0 + ((B * u + 2^13) >> 14)
+        LD      R0, SN_U
         LD      R1, SN_B            ; B = 1814
-        MUL     R2, R4, R1
-        MULH    R3, R4, R1
+        MUL     R2, R0, R1
+        MULH    R3, R0, R1
         LD      R1, SN_HALF         ; 8192 = 2^13
+        AND     R5, R5, #0
         ADD     R2, R2, R1
         ADC     R3, R3, R5
         LSH     R3, R3, #2
@@ -97,42 +126,51 @@ SN_TO_Q14:
 
         LD      R1, SN_ONE          ; 16384
         ADD     R4, R1, R2          ; R4 = den = 1 + B*u
+        ST      R4, SN_DEN
 
-        ; 2d) ratio = ((num << 14) + (den >> 1)) / den  (en Q1.14)
-        ;     Armar dividendo de 32 bits (R3:R2) = (num << 14) + (den >> 1)
+        ; 2d) ratio = round((num / den) * 2^14), generando los 14 bits fraccionarios.
         LD      R0, SN_NUM
-        RSH     R3, R0, #2          ; R3 = num >> 2 (parte alta de num << 14)
-        LSH     R2, R0, #14         ; R2 = (num & 3) << 14 (parte baja)
-        RSH     R1, R4, #1          ; den / 2 (redondeo)
-        ADD     R2, R2, R1
-        ADC     R3, R3, R5          ; Dividendo de 32 bits listo en R3:R2
+        LD      R1, SN_DEN
+        ADD     R3, R0, #0          ; R3 = resto inicial
+        AND     R2, R2, #0          ; R2 = cociente Q1.14
+        AND     R5, R5, #0
+        ADD     R5, R5, #7
+        ADD     R5, R5, #7          ; 14 iteraciones
+        NOT     R4, R1
+        ADD     R4, R4, #1          ; R4 = -den
+SN_DIV_FRAC_LOOP:
+        LSH     R3, R3, #1          ; candidato = resto * 2
+        ADD     R0, R3, #0
+        BRn     SN_DIV_FRAC_GE      ; candidato >= 32768 > den
+        DIV     R0, R0, R1          ; cociente del paso (0 o 1)
+        MOD     R3, R3, R1          ; resto del paso
+        BR      SN_DIV_FRAC_NEXT
+SN_DIV_FRAC_GE:
+        ADD     R3, R3, R4          ; candidato - den, sin desbordar
+        AND     R0, R0, #0
+        ADD     R0, R0, #1
+SN_DIV_FRAC_NEXT:
+        LSH     R2, R2, #1
+        ADD     R2, R2, R0
+        ADD     R5, R5, #-1
+        BRp     SN_DIV_FRAC_LOOP
 
-        ; Dividir R3:R2 entre den (R4) con cociente en R5 (14 pasos o reducción directa)
-        ; Como num <= den, R3 < den: realizamos división restauradora rápida de 14 bits
-        ; sobre R3 (resto inicial) bajando los 2 bits altos de R2 y luego 12 ceros:
-        ; Alternativa directa O(1) usando DIV y MOD sobre mitades:
-        ;   (R3 * 65536 + R2) / den:
-        ;   Paso 1 (8 bits altos): tmp1 = (R3 << 8) | (R2 >> 8)
-        LSH     R0, R3, #8
-        RSH     R1, R2, #8
-        OR      R0, R0, R1          ; tmp1 = bits [23:8] del dividendo (<= 65535)
-        DIV     R5, R0, R4          ; q_hi = tmp1 / den
-        MOD     R3, R0, R4          ; rem1 = tmp1 % den
-
-        ;   Paso 2 (8 bits bajos): tmp2 = (rem1 << 8) | (R2 & x00FF)
-        LSH     R3, R3, #8
-        LD      R1, SN_M00FF
-        AND     R2, R2, R1
-        OR      R0, R3, R2          ; tmp2 = (rem1 << 8) | low_byte (<= 65535)
-        DIV     R1, R0, R4          ; q_lo = tmp2 / den
-
-        LSH     R5, R5, #8
-        OR      R4, R5, R1          ; R4 = ratio en Q1.14
+        ; Redondear según el resto que quedó luego de obtener los 14 bits.
+        LSH     R3, R3, #1
+        ADD     R0, R3, #0
+        BRn     SN_DIV_FRAC_ROUND
+        ADD     R0, R3, R4
+        BRc     SN_DIV_FRAC_ROUND
+        BR      SN_DIV_FRAC_DONE
+SN_DIV_FRAC_ROUND:
+        ADD     R2, R2, #1
+SN_DIV_FRAC_DONE:
 
         ; 2e) sen = (x * ratio + 2^13) >> 14
         LD      R0, SN_X
-        MUL     R2, R0, R4
-        MULH    R3, R0, R4
+        ADD     R1, R2, #0          ; ratio devuelto por la división
+        MUL     R2, R0, R1
+        MULH    R3, R0, R1
         LD      R1, SN_HALF         ; 8192 = 2^13
         AND     R5, R5, #0
         ADD     R2, R2, R1
@@ -164,30 +202,5 @@ SN_EXIT:
         LD      R7, SN_R7
         ADD     R0, R0, #0          ; Actualizar CC según resultado en R0
         RET
-
-;=====================================================================
-; ZONA DE DATOS Y CONSTANTES
-;=====================================================================
-SN_ONE:         .FILL #16384        ; 1.0 en Q1.14 (2^14)
-SN_NEG_ONE:     .FILL #-16384       ; -1.0 en Q1.14
-SN_HALF:        .FILL #8192         ; 0.5 en Q1.14 (2^13, redondeo)
-SN_N2PI:        .FILL #-25736       ; -2*pi en Q3.12
-SN_PI:          .FILL #12868        ; +pi en Q3.12
-SN_NPI:         .FILL #-12868       ; -pi en Q3.12
-SN_NHALFPI:     .FILL #-6434        ; -pi/2 en Q3.12
-SN_A:           .FILL #3672         ; A = 0.2241 en Q1.14
-SN_B:           .FILL #1814         ; B = 0.1107 en Q1.14
-SN_M00FF:       .FILL x00FF
-
-SN_SIGN:        .FILL #0
-SN_X:           .FILL #0
-SN_NUM:         .FILL #0
-
-SN_R1:          .FILL #0
-SN_R2:          .FILL #0
-SN_R3:          .FILL #0
-SN_R4:          .FILL #0
-SN_R5:          .FILL #0
-SN_R7:          .FILL #0
 
 .END

@@ -7,7 +7,7 @@
 ;     R0 = e^A en Q7.8 con signo (saturado a x7FFF si e^A >= 128)
 ;     EST_EXP  = 0 (normal), 1 (saturado), 2 (redondeado a cero)
 ;     NUM_ITER = 6 (cálculo normal), 0 (saturación detectada al entrar)
-;   Conserva: R1-R5, R6 (intacto) y R7.
+;   Conserva: R1-R5 y R7; no utiliza R6.
 ;   CC refleja el valor de R0 al retornar.
 ;=====================================================================
 EXP_Q3_12:
@@ -23,8 +23,15 @@ EXP_Q3_12:
         BRn     EXP_NEG
         LD      R2, NEG_LIMITE      ; -19873 (-x4DA1)
         ADD     R2, R0, R2
-        BRp     EXP_SAT_IN          ; A > límite -> saturar inmediatamente
+        BRn     EXP_NORMAL          ; A < límite
 
+        LD      R0, MAX_Q7_8
+        AND     R1, R1, #0
+        ADD     R1, R1, #1          ; EST_EXP = 1 (saturado)
+        AND     R2, R2, #0          ; NUM_ITER = 0 (saturación al entrar)
+        BR      EXP_EXIT
+
+EXP_NORMAL:
         AND     R5, R5, #0          ; R5 = 0 (signo positivo)
         BR      EXP_REDUCE
 
@@ -86,7 +93,43 @@ EXP_RED_DONE:
         LSH     R1, R1, #7
         RSH     R2, R2, #9
         OR      R2, R1, R2          ; R2 = r en Q1.15 (0 <= r < 22713)
+        BR      EXP_REMAINDER_SIGN
 
+NEG_LIMITE:   .FILL #-19873         ; -x4DA1 (límite de saturación en Q3.12)
+MAX_Q7_8:     .FILL x7FFF           ; Valor máximo positivo en Q7.8
+MASK_NIBBLE:  .FILL x000F           ; Máscara de 4 bits bajos
+LN2_HI:       .FILL x00B1           ; Parte alta de ln(2) * 2^24
+LN2_LO:       .FILL x7218           ; Parte baja de ln(2) * 2^24
+LN2_Q15:      .FILL #22713          ; round(ln(2) * 32768)
+ONE_Q15:      .FILL x8000           ; 1.0 en Q1.15 sin signo
+MASK_BYTE:    .FILL x00FF
+
+TEMP_K:       .FILL #0
+EST_EXP:      .FILL #0
+NUM_ITER:     .FILL #0
+TEMP_R:       .FILL #0
+TEMP_J:       .FILL #0
+
+EXP_EXIT:
+        ST      R1, EST_EXP
+        ST      R2, NUM_ITER
+        LD      R1, G6_EXP_R1
+        LD      R2, G6_EXP_R2
+        LD      R3, G6_EXP_R3
+        LD      R4, G6_EXP_R4
+        LD      R5, G6_EXP_R5
+        LD      R7, G6_EXP_R7
+        ADD     R0, R0, #0          ; Actualizar CC con el resultado en R0
+        RET
+
+G6_EXP_R1:    .FILL #0
+G6_EXP_R2:    .FILL #0
+G6_EXP_R3:    .FILL #0
+G6_EXP_R4:    .FILL #0
+G6_EXP_R5:    .FILL #0
+G6_EXP_R7:    .FILL #0
+
+EXP_REMAINDER_SIGN:
         ; Si A era negativo (R5 == 1):
         ;   Si r == 0 -> k = -k, r = 0
         ;   Si r > 0  -> k = -k - 1, r = ln(2)_Q15 - r
@@ -110,22 +153,50 @@ EXP_COMP_R:
         ; ------------------------------------------------------------
 EXP_TAYLOR:
         ST      R0, TEMP_K          ; Guardar k en memoria temporal
+        ST      R2, TEMP_R          ; El resto no debe alterarse durante el esquema de Horner
         LD      R3, ONE_Q15         ; Acumulador E = 1.0 (x8000 en Q1.15)
         AND     R4, R4, #0
         ADD     R4, R4, #6          ; j = 6 iteraciones (6, 5, 4, 3, 2, 1)
 
 EXP_HORNER_LOOP:
-        ; Paso 1: R3 = E / j  (usando DIV por hardware)
-        DIV     R3, R3, R4
-        ; Paso 2: R3 = (R3 * r) >> 15  (multiplicación Q1.15 por hardware)
-        MUL     R0, R3, R2          ; Bits bajos [15:0]
-        MULH    R1, R3, R2          ; Bits altos [31:16]
-        LSH     R1, R1, #1
-        RSH     R0, R0, #15
-        OR      R3, R1, R0          ; R3 = (E / j) * r en Q1.15
+        ; Paso 1: dividir E entre j como entero sin signo.
+        ; E puede tener el bit alto activo, así que se dividen sus bytes por separado.
+        ST      R4, TEMP_J
+        RSH     R0, R3, #8          ; byte alto de E
+        LD      R1, MASK_BYTE
+        AND     R1, R3, R1          ; byte bajo de E
+        DIV     R2, R0, R4          ; byte alto del cociente
+        MOD     R0, R0, R4          ; resto del byte alto
+        LSH     R0, R0, #8
+        OR      R0, R0, R1          ; resto * 256 + byte bajo
+        DIV     R0, R0, R4
+        LSH     R2, R2, #8
+        OR      R3, R2, R0          ; E / j, sin signo
+
+        ; Paso 2: (E * r) >> 15, con E y r tratados como Q1.15 sin signo.
+        ; Si E/j tiene bit alto activo, compensar el producto firmado de MULH.
+        ADD     R0, R3, #0
+        BRn     EXP_MUL_Q_NEG
+        AND     R4, R4, #0
+        BR      EXP_MUL_Q_READY
+EXP_MUL_Q_NEG:
+        AND     R4, R4, #0
+        ADD     R4, R4, #1
+EXP_MUL_Q_READY:
+        LD      R1, TEMP_R
+        MUL     R2, R0, R1          ; palabra baja del producto firmado
+        MULH    R3, R0, R1          ; palabra alta del producto firmado
+        ADD     R4, R4, #0
+        BRz     EXP_MUL_Q_CORRECT
+        ADD     R3, R3, R1          ; sumar r * 2^16 para recuperar E sin signo
+EXP_MUL_Q_CORRECT:
+        LSH     R3, R3, #1
+        RSH     R2, R2, #15
+        OR      R3, R3, R2          ; R3 = (E / j) * r en Q1.15
         ; Paso 3: E = 1.0 + R3
         LD      R0, ONE_Q15
         ADD     R3, R3, R0          ; E en Q1.15 [x8000 .. xFFFE]
+        LD      R4, TEMP_J
         ADD     R4, R4, #-1
         BRp     EXP_HORNER_LOOP
 
@@ -187,45 +258,5 @@ EXP_DONE_6:
         AND     R2, R2, #0
         ADD     R2, R2, #6          ; NUM_ITER = 6
         BR      EXP_EXIT
-
-EXP_SAT_IN:
-        LD      R0, MAX_Q7_8        ; R0 = x7FFF
-        AND     R1, R1, #0
-        ADD     R1, R1, #1          ; EST_EXP = 1 (saturado)
-        AND     R2, R2, #0          ; NUM_ITER = 0 (saturación al entrar)
-
-EXP_EXIT:
-        ST      R1, EST_EXP
-        ST      R2, NUM_ITER
-        LD      R1, G6_EXP_R1
-        LD      R2, G6_EXP_R2
-        LD      R3, G6_EXP_R3
-        LD      R4, G6_EXP_R4
-        LD      R5, G6_EXP_R5
-        LD      R7, G6_EXP_R7
-        ADD     R0, R0, #0          ; Actualizar CC con el resultado en R0
-        RET
-
-;=====================================================================
-; ZONA DE DATOS Y CONSTANTES
-;=====================================================================
-NEG_LIMITE:   .FILL #-19873         ; -x4DA1 (límite de saturación en Q3.12)
-MAX_Q7_8:     .FILL x7FFF           ; Valor máximo positivo en Q7.8
-MASK_NIBBLE:  .FILL x000F           ; Máscara de 4 bits bajos
-LN2_HI:       .FILL x00B1           ; Parte alta de ln(2) * 2^24
-LN2_LO:       .FILL x7218           ; Parte baja de ln(2) * 2^24
-LN2_Q15:      .FILL #22713          ; round(ln(2) * 32768)
-ONE_Q15:      .FILL x8000           ; 1.0 en Q1.15 sin signo
-
-TEMP_K:       .FILL #0
-EST_EXP:      .FILL #0
-NUM_ITER:     .FILL #0
-
-G6_EXP_R1:    .FILL #0
-G6_EXP_R2:    .FILL #0
-G6_EXP_R3:    .FILL #0
-G6_EXP_R4:    .FILL #0
-G6_EXP_R5:    .FILL #0
-G6_EXP_R7:    .FILL #0
 
 .END
