@@ -48,3 +48,7 @@
 - Pasaje completo del benchmark.
 - Ensamblador e instrucciones corregido.
 - Generación del código del simulador.
+- Generación de un sistema operativo provisional.
+- Testeos del benchmark.
+
+
